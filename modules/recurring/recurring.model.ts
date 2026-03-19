@@ -14,6 +14,7 @@ export function createRecurringRule(input: CreateRecurringRuleInput): RecurringR
     accountId: input.accountId,
     frequency: input.frequency,
     nextDate: input.nextDate,
+    endDate: input.endDate ?? null,
     isActive: true,
     createdAt: now,
     updatedAt: now,

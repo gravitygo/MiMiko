@@ -1,10 +1,10 @@
-import { View, Pressable, StyleSheet } from 'react-native';
-import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -19,6 +19,7 @@ const TAB_CONFIG: Record<string, TabConfig> = {
   transactions: { iconFocused: 'list', iconDefault: 'list-outline', label: 'Transactions' },
   add: { iconFocused: 'add', iconDefault: 'add', label: '' },
   budgets: { iconFocused: 'pie-chart', iconDefault: 'pie-chart-outline', label: 'Budgets' },
+  payables: { iconFocused: 'document-text', iconDefault: 'document-text-outline', label: 'Payables' },
   settings: { iconFocused: 'settings', iconDefault: 'settings-outline', label: 'Settings' },
 };
 

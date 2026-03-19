@@ -64,6 +64,7 @@ export const CREATE_TABLES = `
     account_id TEXT NOT NULL,
     frequency TEXT NOT NULL CHECK (frequency IN ('daily', 'weekly', 'monthly', 'yearly')),
     next_date TEXT NOT NULL,
+    end_date TEXT,
     is_active INTEGER DEFAULT 1,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,

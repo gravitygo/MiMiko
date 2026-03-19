@@ -75,27 +75,36 @@ Location: `components/dashboard/`
 - FlatList with grouped transactions by date
 - Date headers: Today, Yesterday, or full date
 - TransactionItem component with category icon, name, amount
+- Edit/delete modal on tap: edit amount, description, date (DatePickerField), delete with confirmation
 - Empty state with "Add Transaction" CTA
-- Safe area insets (top + bottom for floating nav)
 - Pull-to-refresh support
 
 ### Budgets (`app/(tabs)/budgets.tsx`)
 - Budget list with progress indicators
-- Add/edit budget modal with Monthly vs Category type selector
+- Create budget modal with Monthly vs Category type selector
+- Edit budget modal on card tap (name, amount, delete)
 - Category picker (horizontal scroll) when type is "category"
 - Auto-names budget from selected category
 - Alert level visualization (safe/warning/exceeded)
 - Overview header with total budget stats
-- Safe area insets (top + bottom for floating nav)
 - Pull-to-refresh support
 
 ### Add Transaction (`app/(tabs)/add.tsx`)
-- Transaction form with amount, description, date
+- Transaction form with amount, description
 - Category picker with Ionicons grid + "Manage" link to /categories
 - Account selector with Ionicons + "Manage" link to /accounts
 - Type toggle (expense/income)
-- Recurring toggle (Switch) — when on shows frequency picker + next date
+- Recurring toggle (Switch) — shows frequency picker, next date (DatePickerField), end date (DatePickerField)
 - On submit with recurring: creates both transaction + recurring rule
+
+### Payables (`app/(tabs)/payables.tsx`)
+- Tab screen for tracking debts/utang/installments
+- Unpaid/Paid toggle filter
+- Total outstanding header
+- PayableItem with progress bar, due date, overdue indicator
+- Create modal: name, total amount, due date (DatePickerField), description
+- Detail modal: view total/remaining, make partial payment, mark fully paid, delete
+- Uses `usePayables` hook
 
 ### Categories Management (`app/categories.tsx`)
 - Full-screen modal (Stack.Screen)

@@ -25,21 +25,24 @@ UI → Hooks → Service → Repository → Database
 - Category module (all files)
 - Account module (all files)
 - Budget module (all files)
-- Recurring module (all files)
-- All Zustand stores
-- Database schema + seeds
+- Recurring module (all files, endDate support)
+- Payable module (new — types, model, mapper, repo, service)
+- All Zustand stores (+ settings store, payable store)
+- Database schema + seeds + migrations (end_date, payables table)
+- resetAllData() for full data wipe
 
 ### ✅ Completed (Frontend)
-- `app/(tabs)/_layout.tsx` - Tab navigator
-- `app/(tabs)/index.tsx` - Dashboard (real sparkline from last 7 days, empty state placeholders, DB-connected)
-- `app/(tabs)/transactions.tsx` - Full transaction list (DB-connected)
-- `app/(tabs)/add.tsx` - Add transaction form (DB-connected)
-- `app/(tabs)/budgets.tsx` - Budgets screen (category picker for category-type budgets, explanations, DB-connected)
-- `app/(tabs)/settings.tsx` - Settings screen (links to accounts, categories, recurring)
+- `app/(tabs)/_layout.tsx` - Tab navigator (6 tabs: home, transactions, add, budgets, payables, settings)
+- `app/(tabs)/index.tsx` - Dashboard (real sparkline, empty states, DB-connected)
+- `app/(tabs)/transactions.tsx` - Transaction list with edit/delete modal (DatePickerField)
+- `app/(tabs)/add.tsx` - Add transaction with recurring toggle (frequency, next date, end date pickers), manage links
+- `app/(tabs)/budgets.tsx` - Budgets with create + edit/delete modals, category picker
+- `app/(tabs)/payables.tsx` - Payables/utang tab (create, partial payment, mark paid, delete)
+- `app/(tabs)/settings.tsx` - Settings (appearance modal, currency modal, reset data button)
 - `app/accounts.tsx` - Account management (CRUD, DB-connected)
 - `app/categories.tsx` - Category management (CRUD, DB-connected)
-- `app/recurring.tsx` - Recurring payments (list, create modal, category/account/frequency pickers, DB-connected)
-- `components/dashboard/` - Dashboard components (BalanceCard, QuickAddCard, CategoryCard, BudgetSummaryCard, RecentTransactionItem)
+- `components/ui/date-picker-field.tsx` - Reusable native DateTimePicker component
+- `components/dashboard/` - Dashboard components
 
 ### ❌ Not Started
 - Voice module

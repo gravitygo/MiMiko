@@ -11,6 +11,7 @@ export interface RecurringRule {
   accountId: string;
   frequency: RecurringFrequency;
   nextDate: string;
+  endDate: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -26,6 +27,7 @@ export interface RecurringRuleRow {
   account_id: string;
   frequency: string;
   next_date: string;
+  end_date: string | null;
   is_active: number;
   created_at: string;
   updated_at: string;
@@ -40,6 +42,7 @@ export interface CreateRecurringRuleInput {
   accountId: string;
   frequency: RecurringFrequency;
   nextDate: string;
+  endDate?: string;
 }
 
 export interface UpdateRecurringRuleInput {
@@ -50,5 +53,6 @@ export interface UpdateRecurringRuleInput {
   accountId?: string;
   frequency?: RecurringFrequency;
   nextDate?: string;
+  endDate?: string;
 }
 

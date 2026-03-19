@@ -1,10 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors } from '@/constants/theme';
+import { resetAllData } from '@/database';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   CURRENCIES,
@@ -157,6 +158,29 @@ export default function SettingsScreen() {
             icon="cloud-download-outline"
             title="Restore"
             subtitle="Import backup"
+          />
+          <Divider />
+          <SettingsItem
+            icon="trash-outline"
+            title="Reset All Data"
+            subtitle="Delete all transactions, budgets, etc."
+            onPress={() => {
+              Alert.alert(
+                'Reset All Data',
+                'This will permanently delete all your transactions, budgets, recurring rules, and payables. Default accounts and categories will be kept. This cannot be undone.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Reset',
+                    style: 'destructive',
+                    onPress: async () => {
+                      await resetAllData();
+                      Alert.alert('Done', 'All data has been reset.');
+                    },
+                  },
+                ]
+              );
+            }}
           />
         </SettingsSection>
 

@@ -1,8 +1,8 @@
 import { Tabs } from 'expo-router';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
 import { FloatingTabBar } from '@/components/navigation';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -42,6 +42,13 @@ export default function TabLayout() {
         name="budgets"
         options={{
           title: 'Budgets',
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="payables"
+        options={{
+          title: 'Payables',
           headerShown: false,
         }}
       />

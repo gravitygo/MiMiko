@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -25,7 +25,7 @@ export default function BudgetsScreen() {
   const [newBudgetType, setNewBudgetType] = useState<BudgetType>('monthly');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
-  const { fetchStatuses, add: addBudget } = useBudgets();
+  const { fetchStatuses, add: addBudget, edit: editBudget, remove: removeBudget } = useBudgets();
   const { fetch: fetchCategories } = useCategories();
 
   const budgetStatuses = useBudgetStore((state) => state.statuses);
@@ -35,6 +35,13 @@ export default function BudgetsScreen() {
     () => categories.filter((c) => c.type === 'expense'),
     [categories]
   );
+
+  // Edit state
+  const [editBudgetId, setEditBudgetId] = useState<string | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   const loadData = useCallback(async () => {
     await Promise.all([fetchStatuses(), fetchCategories()]);
@@ -111,6 +118,43 @@ export default function BudgetsScreen() {
     resetModal();
   }, [newBudgetName, newBudgetAmount, newBudgetType, selectedCategoryId, addBudget, fetchStatuses, resetModal, expenseCategories]);
 
+  const handleBudgetPress = useCallback((id: string) => {
+    const status = budgetStatuses.find((s) => s.budget.id === id);
+    if (!status) return;
+    setEditBudgetId(id);
+    setEditName(status.budget.name);
+    setEditAmount(status.budget.amount.toString());
+    setShowEditModal(true);
+  }, [budgetStatuses]);
+
+  const handleEditSave = useCallback(async () => {
+    if (!editBudgetId) return;
+    const parsed = parseFloat(editAmount);
+    if (isNaN(parsed) || parsed <= 0) return;
+
+    setEditSubmitting(true);
+    await editBudget(editBudgetId, { name: editName.trim(), amount: parsed });
+    setEditSubmitting(false);
+    setShowEditModal(false);
+    await fetchStatuses();
+  }, [editBudgetId, editName, editAmount, editBudget, fetchStatuses]);
+
+  const handleEditDelete = useCallback(async () => {
+    if (!editBudgetId) return;
+    Alert.alert('Delete Budget', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await removeBudget(editBudgetId);
+          setShowEditModal(false);
+          await fetchStatuses();
+        },
+      },
+    ]);
+  }, [editBudgetId, removeBudget, fetchStatuses]);
+
   return (
     <View className="flex-1 bg-background dark:bg-background-dark">
       <ScrollView
@@ -154,6 +198,7 @@ export default function BudgetsScreen() {
                 alertLevel={budget.alertLevel}
                 categoryName={budget.categoryName}
                 categoryColor={budget.categoryColor}
+                onPress={() => handleBudgetPress(budget.id)}
               />
             ))}
           </View>
@@ -268,6 +313,55 @@ export default function BudgetsScreen() {
                 Create Budget
               </Text>
             </Pressable>
+
+            <View className="h-6" />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Budget Modal */}
+      <Modal visible={showEditModal} animationType="slide" transparent onRequestClose={() => setShowEditModal(false)}>
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-surface dark:bg-surface-dark rounded-t-3xl p-6">
+            <View className="flex-row items-center justify-between mb-6">
+              <Text className="text-text-primary dark:text-text-primary-dark text-xl font-bold">Edit Budget</Text>
+              <Pressable onPress={() => setShowEditModal(false)} className="w-8 h-8 rounded-full bg-surface-hover dark:bg-surface-hover-dark items-center justify-center">
+                <Ionicons name="close" size={20} color="#71717A" />
+              </Pressable>
+            </View>
+
+            <Text className="text-text-muted dark:text-text-muted-dark text-sm mb-2">Name</Text>
+            <TextInput
+              value={editName}
+              onChangeText={setEditName}
+              placeholderTextColor="#71717A"
+              className="bg-surface-hover dark:bg-surface-hover-dark text-text-primary dark:text-text-primary-dark rounded-2xl px-4 py-3 mb-4"
+            />
+
+            <Text className="text-text-muted dark:text-text-muted-dark text-sm mb-2">Limit Amount</Text>
+            <TextInput
+              value={editAmount}
+              onChangeText={(t) => setEditAmount(t.replace(/[^0-9.]/g, ''))}
+              keyboardType="numeric"
+              className="bg-surface-hover dark:bg-surface-hover-dark text-text-primary dark:text-text-primary-dark rounded-2xl px-4 py-3 mb-6"
+            />
+
+            <View className="flex-row">
+              <Pressable
+                onPress={handleEditDelete}
+                className="flex-1 py-4 rounded-2xl items-center mr-2"
+                style={{ backgroundColor: '#FF6B6B20' }}
+              >
+                <Text style={{ color: '#FF6B6B' }} className="font-semibold">Delete</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleEditSave}
+                disabled={editSubmitting}
+                className="flex-1 py-4 rounded-2xl items-center ml-2 bg-primary"
+              >
+                <Text className="text-white font-semibold">{editSubmitting ? 'Saving...' : 'Save'}</Text>
+              </Pressable>
+            </View>
 
             <View className="h-6" />
           </View>

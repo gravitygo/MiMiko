@@ -1,4 +1,4 @@
-import type { RecurringRule, RecurringRuleRow, RecurringFrequency, RecurringType } from './recurring.types';
+import type { RecurringFrequency, RecurringRule, RecurringRuleRow, RecurringType } from './recurring.types';
 
 export function mapRowToRecurringRule(row: RecurringRuleRow): RecurringRule {
   return {
@@ -11,6 +11,7 @@ export function mapRowToRecurringRule(row: RecurringRuleRow): RecurringRule {
     accountId: row.account_id,
     frequency: row.frequency as RecurringFrequency,
     nextDate: row.next_date,
+    endDate: row.end_date ?? null,
     isActive: row.is_active === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -28,6 +29,7 @@ export function mapRecurringRuleToRow(rule: RecurringRule): RecurringRuleRow {
     account_id: rule.accountId,
     frequency: rule.frequency,
     next_date: rule.nextDate,
+    end_date: rule.endDate,
     is_active: rule.isActive ? 1 : 0,
     created_at: rule.createdAt,
     updated_at: rule.updatedAt,

@@ -1,18 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, FlatList, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
-import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Modal, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { DatePickerField } from '@/components/ui/date-picker-field';
 import { Colors } from '@/constants/theme';
-import { useTransactionStore } from '@/state/transaction.store';
-import { useCategoryStore } from '@/state/category.store';
-import { useAccountStore } from '@/state/account.store';
-import { useTransactions } from '@/hooks/use-transactions';
-import { useCategories } from '@/hooks/use-categories';
 import { useAccounts } from '@/hooks/use-accounts';
+import { useCategories } from '@/hooks/use-categories';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTransactions } from '@/hooks/use-transactions';
 import type { Transaction } from '@/modules/transaction/transaction.types';
+import { useAccountStore } from '@/state/account.store';
+import { useCategoryStore } from '@/state/category.store';
+import { useTransactionStore } from '@/state/transaction.store';
 
 interface TransactionItemProps {
   transaction: Transaction;
@@ -123,9 +124,19 @@ export default function TransactionsScreen() {
   const categories = useCategoryStore((s) => s.categories);
   const accounts = useAccountStore((s) => s.accounts);
 
-  const { fetch: fetchTransactions } = useTransactions();
+  const { fetch: fetchTransactions, edit: editTransaction, remove: removeTransaction } = useTransactions();
   const { fetch: fetchCategories } = useCategories();
   const { fetch: fetchAccounts } = useAccounts();
+
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
+  const [editAccountId, setEditAccountId] = useState<string | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
@@ -161,11 +172,49 @@ export default function TransactionsScreen() {
   }, [loadData]);
 
   const handlePress = useCallback((id: string) => {
-    useTransactionStore.getState().setSelectedTransaction(
-      transactions.find((t) => t.id === id) ?? null
-    );
-    router.push('/modal');
+    const tx = transactions.find((t) => t.id === id);
+    if (!tx) return;
+    setEditingTx(tx);
+    setEditAmount(tx.amount.toString());
+    setEditDescription(tx.description ?? '');
+    setEditDate(tx.date.split('T')[0]);
+    setEditCategoryId(tx.categoryId);
+    setEditAccountId(tx.accountId);
+    setShowEditModal(true);
   }, [transactions]);
+
+  const handleEditSave = useCallback(async () => {
+    if (!editingTx) return;
+    const parsedAmount = parseFloat(editAmount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) return;
+
+    setEditSubmitting(true);
+    await editTransaction(editingTx.id, {
+      amount: parsedAmount,
+      description: editDescription.trim() || undefined,
+      date: editDate ? new Date(editDate + 'T00:00:00').toISOString() : undefined,
+      categoryId: editCategoryId ?? undefined,
+      accountId: editAccountId ?? undefined,
+    });
+    setEditSubmitting(false);
+    setShowEditModal(false);
+    await fetchTransactions({ limit: 50 });
+  }, [editingTx, editAmount, editDescription, editDate, editCategoryId, editAccountId, editTransaction, fetchTransactions]);
+
+  const handleEditDelete = useCallback(async () => {
+    if (!editingTx) return;
+    Alert.alert('Delete Transaction', 'Are you sure you want to delete this transaction?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await removeTransaction(editingTx.id);
+          setShowEditModal(false);
+        },
+      },
+    ]);
+  }, [editingTx, removeTransaction]);
 
   const handleAddPress = useCallback(() => {
     router.push('/(tabs)/add');
@@ -245,6 +294,64 @@ export default function TransactionsScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       />
+
+      {/* Edit/Delete Modal */}
+      <Modal visible={showEditModal} animationType="slide" transparent onRequestClose={() => setShowEditModal(false)}>
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-surface dark:bg-surface-dark rounded-t-3xl p-6">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-text-primary dark:text-text-primary-dark text-xl font-bold">Edit Transaction</Text>
+              <Pressable onPress={() => setShowEditModal(false)} className="w-8 h-8 rounded-full bg-surface-hover dark:bg-surface-hover-dark items-center justify-center">
+                <Ionicons name="close" size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            <Text className="text-text-muted dark:text-text-muted-dark text-sm mb-2">Amount</Text>
+            <TextInput
+              value={editAmount}
+              onChangeText={(t) => setEditAmount(t.replace(/[^0-9.]/g, ''))}
+              keyboardType="decimal-pad"
+              className="bg-surface-hover dark:bg-surface-hover-dark text-text-primary dark:text-text-primary-dark rounded-bento px-4 py-3 mb-4"
+            />
+
+            <Text className="text-text-muted dark:text-text-muted-dark text-sm mb-2">Description</Text>
+            <TextInput
+              value={editDescription}
+              onChangeText={setEditDescription}
+              placeholder="Description"
+              placeholderTextColor={colors.textMuted}
+              className="bg-surface-hover dark:bg-surface-hover-dark text-text-primary dark:text-text-primary-dark rounded-bento px-4 py-3 mb-4"
+            />
+
+            <DatePickerField label="Date" value={editDate} onChange={setEditDate} />
+
+            <View className="h-4" />
+
+            <View className="flex-row mt-2">
+              <Pressable
+                onPress={handleEditDelete}
+                className="flex-1 py-4 rounded-bento items-center mr-2"
+                style={{ backgroundColor: '#FF6B6B20' }}
+              >
+                <Text style={{ color: '#FF6B6B' }} className="font-semibold">Delete</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleEditSave}
+                disabled={editSubmitting}
+                className="flex-1 py-4 rounded-bento items-center ml-2 bg-primary"
+              >
+                {editSubmitting ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text className="text-white font-semibold">Save</Text>
+                )}
+              </Pressable>
+            </View>
+
+            <View style={{ height: insets.bottom + 16 }} />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

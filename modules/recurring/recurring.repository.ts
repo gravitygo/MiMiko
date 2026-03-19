@@ -7,8 +7,8 @@ export function createRecurringRepository() {
     async insert(rule: RecurringRule): Promise<void> {
       const db = await getDatabase();
       await db.runAsync(
-        `INSERT INTO recurring_rules (id, name, type, amount, description, category_id, account_id, frequency, next_date, is_active, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO recurring_rules (id, name, type, amount, description, category_id, account_id, frequency, next_date, end_date, is_active, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           rule.id,
           rule.name,
@@ -19,6 +19,7 @@ export function createRecurringRepository() {
           rule.accountId,
           rule.frequency,
           rule.nextDate,
+          rule.endDate,
           rule.isActive ? 1 : 0,
           rule.createdAt,
           rule.updatedAt,
@@ -29,7 +30,7 @@ export function createRecurringRepository() {
     async update(rule: RecurringRule): Promise<void> {
       const db = await getDatabase();
       await db.runAsync(
-        `UPDATE recurring_rules SET name = ?, amount = ?, description = ?, category_id = ?, account_id = ?, frequency = ?, next_date = ?, is_active = ?, updated_at = ? WHERE id = ?`,
+        `UPDATE recurring_rules SET name = ?, amount = ?, description = ?, category_id = ?, account_id = ?, frequency = ?, next_date = ?, end_date = ?, is_active = ?, updated_at = ? WHERE id = ?`,
         [
           rule.name,
           rule.amount,
@@ -38,6 +39,7 @@ export function createRecurringRepository() {
           rule.accountId,
           rule.frequency,
           rule.nextDate,
+          rule.endDate,
           rule.isActive ? 1 : 0,
           rule.updatedAt,
           rule.id,

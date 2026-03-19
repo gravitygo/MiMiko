@@ -13,6 +13,7 @@ import {
     View,
 } from 'react-native';
 
+import { DatePickerField } from '@/components/ui/date-picker-field';
 import { Colors } from '@/constants/theme';
 import { useAccounts } from '@/hooks/use-accounts';
 import { useCategories } from '@/hooks/use-categories';
@@ -124,6 +125,7 @@ export default function AddTransactionScreen() {
   const [isRecurring, setIsRecurring] = useState(false);
   const [frequency, setFrequency] = useState<RecurringFrequency>('monthly');
   const [nextDate, setNextDate] = useState(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState('');
 
   const categories = useCategoryStore((s) => s.categories);
   const accounts = useAccountStore((s) => s.accounts);
@@ -194,6 +196,7 @@ export default function AddTransactionScreen() {
         accountId: selectedAccountId,
         frequency,
         nextDate,
+        endDate: endDate || undefined,
       });
     }
 
@@ -203,9 +206,10 @@ export default function AddTransactionScreen() {
       setAmount('');
       setDescription('');
       setIsRecurring(false);
+      setEndDate('');
       router.back();
     }
-  }, [amount, description, selectedCategoryId, selectedAccountId, activeTab, addTransaction, isRecurring, addRecurringRule, frequency, nextDate]);
+  }, [amount, description, selectedCategoryId, selectedAccountId, activeTab, addTransaction, isRecurring, addRecurringRule, frequency, nextDate, endDate]);
 
   const canSubmit = useMemo(() => {
     const parsedAmount = parseFloat(amount);
@@ -341,12 +345,18 @@ export default function AddTransactionScreen() {
             <Text className="text-text-secondary dark:text-text-secondary-dark text-sm font-medium mb-2">
               Next Payment Date
             </Text>
-            <TextInput
+            <DatePickerField
               value={nextDate}
-              onChangeText={setNextDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.textMuted}
-              className="bg-surface dark:bg-surface-dark rounded-bento px-4 py-3 text-text-primary dark:text-text-primary-dark"
+              onChange={setNextDate}
+            />
+            <View className="h-3" />
+            <Text className="text-text-secondary dark:text-text-secondary-dark text-sm font-medium mb-2">
+              End Date (optional)
+            </Text>
+            <DatePickerField
+              value={endDate}
+              onChange={setEndDate}
+              placeholder="No end date"
             />
           </View>
         )}

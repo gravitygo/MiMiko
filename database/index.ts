@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { CREATE_TABLES, DEFAULT_CATEGORIES, DEFAULT_ACCOUNTS } from './schema';
+import { CREATE_TABLES, DEFAULT_ACCOUNTS, DEFAULT_CATEGORIES } from './schema';
 
 const DATABASE_NAME = 'mikiko.db';
 
@@ -18,7 +18,49 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 export async function initializeDatabase(): Promise<void> {
   const database = await getDatabase();
   await database.execAsync(CREATE_TABLES);
+
+  // Migration: add end_date column if missing
+  try {
+    await database.execAsync('ALTER TABLE recurring_rules ADD COLUMN end_date TEXT');
+  } catch {
+    // Column already exists
+  }
+
+  // Migration: create payables table
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS payables (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      total_amount REAL NOT NULL,
+      remaining_amount REAL NOT NULL,
+      due_date TEXT NOT NULL,
+      description TEXT,
+      is_paid INTEGER DEFAULT 0,
+      category_id TEXT,
+      account_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (category_id) REFERENCES categories(id),
+      FOREIGN KEY (account_id) REFERENCES accounts(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_payables_due_date ON payables(due_date);
+    CREATE INDEX IF NOT EXISTS idx_payables_is_paid ON payables(is_paid);
+  `);
+
   await seedDefaultData(database);
+}
+
+export async function resetAllData(): Promise<void> {
+  const database = await getDatabase();
+  await database.execAsync(`
+    DELETE FROM transactions;
+    DELETE FROM recurring_rules;
+    DELETE FROM budgets;
+    DELETE FROM payables;
+    DELETE FROM accounts WHERE is_default = 0;
+    DELETE FROM categories WHERE is_default = 0;
+    UPDATE accounts SET balance = 0;
+  `);
 }
 
 async function seedDefaultData(database: SQLite.SQLiteDatabase): Promise<void> {
@@ -59,5 +101,5 @@ export async function closeDatabase(): Promise<void> {
   db = null;
 }
 
-export { CREATE_TABLES, DEFAULT_CATEGORIES, DEFAULT_ACCOUNTS } from './schema';
+export { CREATE_TABLES, DEFAULT_ACCOUNTS, DEFAULT_CATEGORIES } from './schema';
 
