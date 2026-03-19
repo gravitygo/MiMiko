@@ -19,7 +19,6 @@ const TAB_CONFIG: Record<string, TabConfig> = {
   transactions: { iconFocused: 'list', iconDefault: 'list-outline', label: 'Transactions' },
   add: { iconFocused: 'add', iconDefault: 'add', label: '' },
   budgets: { iconFocused: 'pie-chart', iconDefault: 'pie-chart-outline', label: 'Budgets' },
-  payables: { iconFocused: 'document-text', iconDefault: 'document-text-outline', label: 'Payables' },
   settings: { iconFocused: 'settings', iconDefault: 'settings-outline', label: 'Settings' },
 };
 
@@ -44,9 +43,11 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
       ]}
     >
       {state.routes.map((route, index) => {
+        const config = TAB_CONFIG[route.name];
+        if (!config) return null;
+
         const { options } = descriptors[route.key];
         const isFocused = state.index === index;
-        const config = TAB_CONFIG[route.name];
         const isAddButton = route.name === 'add';
 
         const onPress = () => {

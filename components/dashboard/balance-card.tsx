@@ -42,6 +42,8 @@ export function BalanceCard({ totalBalance, income, expense, sparklineData = [] 
     maximumFractionDigits: 0,
   }).format(totalBalance);
 
+  const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
   return (
     <BentoCard size="2x2" className="justify-between">
       <View>
@@ -55,28 +57,33 @@ export function BalanceCard({ totalBalance, income, expense, sparklineData = [] 
 
       {sparklineData.length > 0 && <MiniSparkline data={sparklineData} />}
 
-      <View className="flex-row justify-between mt-3">
-        <View className="flex-row items-center">
-          <View className="w-8 h-8 rounded-full bg-secondary/20 items-center justify-center mr-2">
-            <Ionicons name="arrow-down" size={16} color="#05DF72" />
+      <View className="mt-3">
+        <Text className="text-text-muted dark:text-text-muted-dark text-xs font-medium mb-2">
+          {currentMonth}
+        </Text>
+        <View className="flex-row justify-between">
+          <View className="flex-row items-center">
+            <View className="w-8 h-8 rounded-full bg-secondary/20 items-center justify-center mr-2">
+              <Ionicons name="arrow-down" size={16} color="#05DF72" />
+            </View>
+            <View>
+              <Text className="text-text-muted dark:text-text-muted-dark text-xs">Income</Text>
+              <Text className="text-secondary font-semibold">
+                +${income.toLocaleString()}
+              </Text>
+            </View>
           </View>
-          <View>
-            <Text className="text-text-muted dark:text-text-muted-dark text-xs">Income</Text>
-            <Text className="text-secondary font-semibold">
-              +${income.toLocaleString()}
-            </Text>
-          </View>
-        </View>
 
-        <View className="flex-row items-center">
-          <View className="w-8 h-8 rounded-full bg-expense/20 items-center justify-center mr-2">
-            <Ionicons name="arrow-up" size={16} color="#FF6B6B" />
-          </View>
-          <View>
-            <Text className="text-text-muted dark:text-text-muted-dark text-xs">Expense</Text>
-            <Text className="text-expense font-semibold">
-              -${expense.toLocaleString()}
-            </Text>
+          <View className="flex-row items-center">
+            <View className="w-8 h-8 rounded-full bg-expense/20 items-center justify-center mr-2">
+              <Ionicons name="arrow-up" size={16} color="#FF6B6B" />
+            </View>
+            <View>
+              <Text className="text-text-muted dark:text-text-muted-dark text-xs">Expense</Text>
+              <Text className="text-expense font-semibold">
+                -${expense.toLocaleString()}
+              </Text>
+            </View>
           </View>
         </View>
       </View>

@@ -32,12 +32,12 @@ UI → Hooks → Service → Repository → Database
 - resetAllData() for full data wipe
 
 ### ✅ Completed (Frontend)
-- `app/(tabs)/_layout.tsx` - Tab navigator (6 tabs: home, transactions, add, budgets, payables, settings)
-- `app/(tabs)/index.tsx` - Dashboard (real sparkline, empty states, DB-connected)
-- `app/(tabs)/transactions.tsx` - Transaction list with edit/delete modal (DatePickerField)
+- `app/(tabs)/_layout.tsx` - Tab navigator (5 tabs: home, transactions, add, budgets, settings; payables hidden)
+- `app/(tabs)/index.tsx` - Dashboard (real sparkline, empty states, DB-connected, useFocusEffect for real-time updates)
+- `app/(tabs)/transactions.tsx` - Transaction list with edit/delete modal (DatePickerField, useFocusEffect)
 - `app/(tabs)/add.tsx` - Add transaction with recurring toggle (frequency, next date, end date pickers), manage links
-- `app/(tabs)/budgets.tsx` - Budgets with create + edit/delete modals, category picker
-- `app/(tabs)/payables.tsx` - Payables/utang tab (create, partial payment, mark paid, delete)
+- `app/(tabs)/budgets.tsx` - Budgets with create + edit/delete modals, category picker, category pie chart (useFocusEffect)
+- `app/(tabs)/payables.tsx` - Payables/utang (hidden from tabs, still accessible via route)
 - `app/(tabs)/settings.tsx` - Settings (appearance modal, currency modal, reset data button)
 - `app/accounts.tsx` - Account management (CRUD, DB-connected)
 - `app/categories.tsx` - Category management (CRUD, DB-connected)

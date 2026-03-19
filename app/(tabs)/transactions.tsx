@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Modal, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { DatePickerField } from '@/components/ui/date-picker-field';
 import { Colors } from '@/constants/theme';
@@ -161,9 +162,11 @@ export default function TransactionsScreen() {
     ]);
   }, [fetchTransactions, fetchCategories, fetchAccounts]);
 
-  useEffect(() => {
-    loadData().finally(() => setInitialLoading(false));
-  }, [loadData]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData().finally(() => setInitialLoading(false));
+    }, [loadData])
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

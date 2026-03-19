@@ -1,20 +1,24 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 
 import {
     AddBudgetCard,
     BudgetCard,
     BudgetOverviewHeader,
+    CategoryPieChart,
     EmptyBudgets,
 } from '@/components/budgets';
 import { useBudgets } from '@/hooks/use-budgets';
 import { useCategories } from '@/hooks/use-categories';
+import { useTransactions } from '@/hooks/use-transactions';
 import type { BudgetType } from '@/modules/budget';
 import { getMonthDateRange } from '@/modules/budget';
 import { useBudgetStore } from '@/state/budget.store';
 import { useCategoryStore } from '@/state/category.store';
+import { useTransactionStore } from '@/state/transaction.store';
 
 export default function BudgetsScreen() {
   const insets = useSafeAreaInsets();
@@ -27,9 +31,11 @@ export default function BudgetsScreen() {
 
   const { fetchStatuses, add: addBudget, edit: editBudget, remove: removeBudget } = useBudgets();
   const { fetch: fetchCategories } = useCategories();
+  const { fetch: fetchTransactions } = useTransactions();
 
   const budgetStatuses = useBudgetStore((state) => state.statuses);
   const categories = useCategoryStore((state) => state.categories);
+  const transactions = useTransactionStore((state) => state.transactions);
 
   const expenseCategories = useMemo(
     () => categories.filter((c) => c.type === 'expense'),
@@ -44,12 +50,14 @@ export default function BudgetsScreen() {
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   const loadData = useCallback(async () => {
-    await Promise.all([fetchStatuses(), fetchCategories()]);
-  }, [fetchStatuses, fetchCategories]);
+    await Promise.all([fetchStatuses(), fetchCategories(), fetchTransactions({ limit: 100 })]);
+  }, [fetchStatuses, fetchCategories, fetchTransactions]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const { totalBudget, totalSpent } = useMemo(() => {
     return budgetStatuses.reduce(
@@ -80,6 +88,37 @@ export default function BudgetsScreen() {
       };
     });
   }, [budgetStatuses, categories]);
+
+  const { pieSlices, pieTotalSpent } = useMemo(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const spending: Record<string, number> = {};
+
+    transactions.forEach((t) => {
+      if (t.type === 'expense' && t.date >= startOfMonth) {
+        spending[t.categoryId] = (spending[t.categoryId] || 0) + t.amount;
+      }
+    });
+
+    const total = Object.values(spending).reduce((sum, v) => sum + v, 0);
+
+    const slices = Object.entries(spending)
+      .map(([categoryId, amount]) => {
+        const category = categories.find((c) => c.id === categoryId);
+        if (!category) return null;
+        return {
+          id: categoryId,
+          name: category.name,
+          amount,
+          percentage: total > 0 ? (amount / total) * 100 : 0,
+          color: category.color,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => (b?.amount || 0) - (a?.amount || 0)) as { id: string; name: string; amount: number; percentage: number; color: string }[];
+
+    return { pieSlices: slices, pieTotalSpent: total };
+  }, [transactions, categories]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -181,6 +220,14 @@ export default function BudgetsScreen() {
         {budgetStatuses.length > 0 && (
           <BudgetOverviewHeader totalBudget={totalBudget} totalSpent={totalSpent} budgetCount={displayBudgets.length} />
         )}
+
+        {/* Category Spending Breakdown */}
+        <View className="mt-4 mb-4">
+          <Text className="text-text-primary dark:text-text-primary-dark text-lg font-bold tracking-tight mb-3">
+            Spending Breakdown
+          </Text>
+          <CategoryPieChart slices={pieSlices} totalSpent={pieTotalSpent} />
+        </View>
 
         {/* Budget List */}
         {displayBudgets.length > 0 ? (

@@ -15,7 +15,7 @@ Location: `components/dashboard/`
 
 ### balance-card.tsx
 - `BalanceCard`: large 2x2 card showing total balance
-- displays income/expense summary
+- displays income/expense summary with current month label
 - includes mini sparkline graph
 
 ### quick-add-card.tsx
@@ -34,6 +34,21 @@ Location: `components/dashboard/`
 ### recent-transaction-item.tsx
 - `RecentTransactionItem`: list item for transactions
 - shows category icon, description, amount, date
+
+---
+
+## Budget Components
+
+Location: `components/budgets/`
+
+### category-pie-chart.tsx
+- `CategoryPieChart`: donut chart showing expense breakdown by category
+- uses react-native-svg (Svg, Path, Circle)
+- shows legend with category name, percentage, amount
+- center label shows total spent
+
+### budget-card.tsx, budget-overview-header.tsx, etc.
+- Standard budget display components
 
 ---
 

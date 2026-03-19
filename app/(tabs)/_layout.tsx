@@ -48,8 +48,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="payables"
         options={{
-          title: 'Payables',
-          headerShown: false,
+          href: null,
         }}
       />
       <Tabs.Screen
