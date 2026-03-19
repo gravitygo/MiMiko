@@ -1,36 +1,20 @@
-import { View, Text, ScrollView, RefreshControl, Modal, TextInput, Pressable } from 'react-native';
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Modal, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
-  BudgetCard,
-  AddBudgetCard,
-  BudgetOverviewHeader,
-  EmptyBudgets,
+    AddBudgetCard,
+    BudgetCard,
+    BudgetOverviewHeader,
+    EmptyBudgets,
 } from '@/components/budgets';
+import { useBudgets } from '@/hooks/use-budgets';
+import { useCategories } from '@/hooks/use-categories';
+import type { BudgetType } from '@/modules/budget';
+import { getMonthDateRange } from '@/modules/budget';
 import { useBudgetStore } from '@/state/budget.store';
 import { useCategoryStore } from '@/state/category.store';
-import { useBudgets } from '@/hooks/use-budgets';
-import type { BudgetAlertLevel, BudgetType } from '@/modules/budget';
-
-// Mock data for demonstration
-const MOCK_BUDGETS: Array<{
-  id: string;
-  name: string;
-  type: BudgetType;
-  spent: number;
-  total: number;
-  percentage: number;
-  alertLevel: BudgetAlertLevel;
-  categoryName?: string;
-  categoryColor?: string;
-}> = [
-  { id: '1', name: 'Monthly Budget', type: 'monthly', spent: 2340, total: 4000, percentage: 58, alertLevel: 'safe' },
-  { id: '2', name: 'Food & Dining', type: 'category', spent: 420, total: 500, percentage: 84, alertLevel: 'warning', categoryName: 'Food', categoryColor: '#FF6B6B' },
-  { id: '3', name: 'Transportation', type: 'category', spent: 180, total: 300, percentage: 60, alertLevel: 'safe', categoryName: 'Transport', categoryColor: '#45B7D1' },
-  { id: '4', name: 'Entertainment', type: 'category', spent: 250, total: 200, percentage: 125, alertLevel: 'exceeded', categoryName: 'Entertainment', categoryColor: '#DDA0DD' },
-];
 
 export default function BudgetsScreen() {
   const insets = useSafeAreaInsets();
@@ -40,17 +24,31 @@ export default function BudgetsScreen() {
   const [newBudgetAmount, setNewBudgetAmount] = useState('');
   const [newBudgetType, setNewBudgetType] = useState<BudgetType>('monthly');
 
+  // Hooks
+  const { fetch: fetchBudgets, fetchStatuses, add: addBudget } = useBudgets();
+  const { fetch: fetchCategories } = useCategories();
+
   // Stores
   const budgetStatuses = useBudgetStore((state) => state.statuses);
   const categories = useCategoryStore((state) => state.categories);
 
+  // Load data on mount
+  const loadData = useCallback(async () => {
+    await Promise.all([
+      fetchStatuses(),
+      fetchCategories(),
+    ]);
+  }, [fetchStatuses, fetchCategories]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
   // Calculate totals
   const { totalBudget, totalSpent } = useMemo(() => {
-    const data = budgetStatuses.length > 0 ? budgetStatuses : MOCK_BUDGETS;
-    return data.reduce(
+    return budgetStatuses.reduce(
       (acc, status) => {
-        const total = 'total' in status ? status.total : status.budget?.amount || 0;
-        acc.totalBudget += total;
+        acc.totalBudget += status.budget.amount;
         acc.totalSpent += status.spent;
         return acc;
       },
@@ -60,8 +58,6 @@ export default function BudgetsScreen() {
 
   // Transform budget statuses to display format
   const displayBudgets = useMemo(() => {
-    if (budgetStatuses.length === 0) return MOCK_BUDGETS;
-
     return budgetStatuses.map((status) => {
       const category = status.budget.categoryId
         ? categories.find((c) => c.id === status.budget.categoryId)
@@ -73,7 +69,7 @@ export default function BudgetsScreen() {
         type: status.budget.type,
         spent: status.spent,
         total: status.budget.amount,
-        percentage: status.percentage,
+        percentage: Math.round(status.percentage * 100),
         alertLevel: status.alertLevel,
         categoryName: category?.name,
         categoryColor: category?.color,
@@ -81,30 +77,42 @@ export default function BudgetsScreen() {
     });
   }, [budgetStatuses, categories]);
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    // TODO: Implement data refresh from services
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
 
   const handleAddBudget = () => {
     setShowAddModal(true);
   };
 
-  const handleSaveBudget = () => {
-    // TODO: Implement budget creation via service
+  const handleSaveBudget = useCallback(async () => {
+    const parsedAmount = parseFloat(newBudgetAmount);
+    if (!newBudgetName.trim() || isNaN(parsedAmount) || parsedAmount <= 0) return;
+
+    const { startDate, endDate } = getMonthDateRange();
+
+    await addBudget({
+      name: newBudgetName.trim(),
+      type: newBudgetType,
+      amount: parsedAmount,
+      startDate,
+      endDate,
+    });
+
+    await fetchStatuses();
+
     setShowAddModal(false);
     setNewBudgetName('');
     setNewBudgetAmount('');
     setNewBudgetType('monthly');
-  };
+  }, [newBudgetName, newBudgetAmount, newBudgetType, addBudget, fetchStatuses]);
 
   const handleBudgetPress = (budgetId: string) => {
     // TODO: Navigate to budget details or edit modal
     console.log('Budget pressed:', budgetId);
   };
-
-  const hasData = budgetStatuses.length > 0;
 
   return (
     <View className="flex-1 bg-background dark:bg-background-dark">
@@ -135,10 +143,10 @@ export default function BudgetsScreen() {
         </View>
 
         {/* Overview Header */}
-        {(hasData || MOCK_BUDGETS.length > 0) && (
+        {budgetStatuses.length > 0 && (
           <BudgetOverviewHeader
-            totalBudget={totalBudget || 5000}
-            totalSpent={totalSpent || 3190}
+            totalBudget={totalBudget}
+            totalSpent={totalSpent}
             budgetCount={displayBudgets.length}
           />
         )}

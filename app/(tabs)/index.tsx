@@ -1,20 +1,24 @@
-import { View, Text, ScrollView, RefreshControl, Pressable } from 'react-native';
-import { useState, useCallback, useMemo } from 'react';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
-  BalanceCard,
-  QuickAddCard,
-  CategoryCard,
-  RecentTransactionItem,
-  BudgetSummaryCard,
+    BalanceCard,
+    BudgetSummaryCard,
+    CategoryCard,
+    QuickAddCard,
+    RecentTransactionItem,
 } from '@/components/dashboard';
+import { useAccounts } from '@/hooks/use-accounts';
+import { useBudgets } from '@/hooks/use-budgets';
+import { useCategories } from '@/hooks/use-categories';
+import { useTransactions } from '@/hooks/use-transactions';
 import { useAccountStore } from '@/state/account.store';
-import { useTransactionStore } from '@/state/transaction.store';
-import { useCategoryStore } from '@/state/category.store';
 import { useBudgetStore } from '@/state/budget.store';
+import { useCategoryStore } from '@/state/category.store';
+import { useTransactionStore } from '@/state/transaction.store';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -28,6 +32,12 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+
+  // Hooks
+  const { fetch: fetchTransactions } = useTransactions();
+  const { fetch: fetchCategories } = useCategories();
+  const { fetch: fetchAccounts } = useAccounts();
+  const { fetchStatuses: fetchBudgetStatuses } = useBudgets();
 
   // Stores
   const accounts = useAccountStore((state) => state.accounts);
@@ -124,11 +134,24 @@ export default function HomeScreen() {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const onRefresh = useCallback(() => {
+  const loadData = useCallback(async () => {
+    await Promise.all([
+      fetchAccounts(),
+      fetchTransactions({ limit: 50 }),
+      fetchCategories(),
+      fetchBudgetStatuses(),
+    ]);
+  }, [fetchAccounts, fetchTransactions, fetchCategories, fetchBudgetStatuses]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    // TODO: Implement data refresh from services
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
 
   const handleSeeAllTransactions = () => {
     router.push('/transactions');
@@ -139,31 +162,7 @@ export default function HomeScreen() {
     router.push(`/transactions?highlight=${transactionId}`);
   };
 
-  // Show placeholder data when stores are empty
-  const hasData = accounts.length > 0 || transactions.length > 0;
 
-  // Placeholder data
-  const placeholderCategories = [
-    { id: '1', name: 'Food', icon: 'restaurant' as IconName, color: '#FF6B6B', percentage: 35, amount: 820 },
-    { id: '2', name: 'Transport', icon: 'car' as IconName, color: '#45B7D1', percentage: 25, amount: 585 },
-    { id: '3', name: 'Shopping', icon: 'bag' as IconName, color: '#96CEB4', percentage: 22, amount: 515 },
-    { id: '4', name: 'Entertainment', icon: 'game-controller' as IconName, color: '#DDA0DD', percentage: 18, amount: 420 },
-  ];
-
-  const placeholderBudgets = [
-    { budget: { id: '1', name: 'Monthly' }, spent: 2340, percentage: 58, alertLevel: 'safe' as const },
-    { budget: { id: '2', name: 'Food' }, spent: 420, percentage: 84, alertLevel: 'warning' as const },
-  ];
-
-  const placeholderTransactions = [
-    { id: '1', description: 'Grocery Store', amount: 85.50, type: 'expense' as const, categoryName: 'Groceries', categoryIcon: 'cart' as IconName, categoryColor: '#4ECDC4', date: new Date().toISOString() },
-    { id: '2', description: 'Salary', amount: 4200, type: 'income' as const, categoryName: 'Salary', categoryIcon: 'wallet' as IconName, categoryColor: '#05DF72', date: new Date().toISOString() },
-    { id: '3', description: 'Coffee Shop', amount: 12.00, type: 'expense' as const, categoryName: 'Food', categoryIcon: 'restaurant' as IconName, categoryColor: '#FF6B6B', date: new Date(Date.now() - 86400000).toISOString() },
-  ];
-
-  const displayCategories = topCategories.length > 0 ? topCategories : placeholderCategories;
-  const displayBudgets = budgetStatuses.length > 0 ? budgetStatuses.slice(0, 2) : placeholderBudgets;
-  const displayTransactions = recentTransactions.length > 0 ? recentTransactions : placeholderTransactions;
 
   return (
     <ScrollView
@@ -198,9 +197,9 @@ export default function HomeScreen() {
 
       {/* Balance Card - Large 2x2 */}
       <BalanceCard
-        totalBalance={hasData ? totalBalance : 12580}
-        income={hasData ? monthlyIncome : 4200}
-        expense={hasData ? monthlyExpense : 2340}
+        totalBalance={totalBalance}
+        income={monthlyIncome}
+        expense={monthlyExpense}
         sparklineData={MOCK_SPARKLINE}
       />
 
@@ -215,7 +214,7 @@ export default function HomeScreen() {
           Top Categories
         </Text>
         <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-          {displayCategories.map((cat) => (
+          {topCategories.map((cat) => (
             <View key={cat?.id} style={{ width: '50%', paddingHorizontal: 6, marginBottom: 12 }}>
               <CategoryCard
                 name={cat?.name || ''}
@@ -230,19 +229,19 @@ export default function HomeScreen() {
       </View>
 
       {/* Budget Summary - 2 Column Grid */}
-      {(budgetStatuses.length > 0 || !hasData) && (
+      {budgetStatuses.length > 0 && (
         <View className="mt-6">
           <Text className="text-text-primary dark:text-text-primary-dark text-lg font-bold tracking-tight mb-3">
             Budget Overview
           </Text>
           <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-            {displayBudgets.map((status) => (
+            {budgetStatuses.slice(0, 2).map((status) => (
               <View key={status.budget.id} style={{ width: '50%', paddingHorizontal: 6, marginBottom: 12 }}>
                 <BudgetSummaryCard
                   name={status.budget.name}
                   spent={status.spent}
-                  total={Math.round(status.spent / (status.percentage / 100))}
-                  percentage={status.percentage}
+                  total={status.budget.amount}
+                  percentage={Math.round(status.percentage * 100)}
                   alertLevel={status.alertLevel}
                 />
               </View>
@@ -263,7 +262,7 @@ export default function HomeScreen() {
         </View>
 
         <View className="bg-surface dark:bg-surface-dark border border-border/50 dark:border-white/5 rounded-3xl px-4">
-          {displayTransactions.map((transaction, index, arr) => (
+          {recentTransactions.map((transaction, index, arr) => (
             <View key={transaction.id}>
               <RecentTransactionItem
                 description={transaction.description || ''}

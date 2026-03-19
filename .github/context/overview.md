@@ -31,23 +31,18 @@ UI → Hooks → Service → Repository → Database
 
 ### ✅ Completed (Frontend)
 - `app/(tabs)/_layout.tsx` - Tab navigator
-- `app/(tabs)/transactions.tsx` - Full transaction list
-- `app/(tabs)/add.tsx` - Add transaction form
+- `app/(tabs)/index.tsx` - Dashboard (loads real data from DB on mount + pull-to-refresh)
+- `app/(tabs)/transactions.tsx` - Full transaction list (DB-connected)
+- `app/(tabs)/add.tsx` - Add transaction form (DB-connected)
+- `app/(tabs)/budgets.tsx` - Budgets screen (DB-connected, create budget works)
 - `app/(tabs)/settings.tsx` - Settings screen
-
-### 🚧 Partial (Placeholders)
-- `app/(tabs)/budgets.tsx` - Budgets (in progress)
+- `app/accounts.tsx` - Account management (CRUD, DB-connected)
+- `app/categories.tsx` - Category management (CRUD, DB-connected)
+- `components/dashboard/` - Dashboard components (BalanceCard, QuickAddCard, CategoryCard, BudgetSummaryCard, RecentTransactionItem)
 
 ### ❌ Not Started
 - Voice module
 - AI module
-
-### ✅ Recently Completed
-- `app/(tabs)/index.tsx` - Dashboard with Bento Box UI
-- `components/dashboard/` - Dashboard components (BalanceCard, QuickAddCard, CategoryCard, BudgetSummaryCard, RecentTransactionItem)
-- `app/categories.tsx` - Category management screen with icon picker
-- `app/accounts.tsx` - Account management screen
-- Icon rendering fix across all screens (Ionicons instead of text)
 - Stack navigator routes for `accounts` and `categories` screens
 
 ---
