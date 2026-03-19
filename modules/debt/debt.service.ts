@@ -1,7 +1,7 @@
+import { createTransactionService } from '@/modules/transaction/transaction.service';
 import { createDebt } from './debt.model';
 import { createDebtRepository } from './debt.repository';
-import { createTransactionService } from '@/modules/transaction/transaction.service';
-import type { Debt, CreateDebtInput, UpdateDebtInput } from './debt.types';
+import type { CreateDebtInput, Debt, UpdateDebtInput } from './debt.types';
 
 export function createDebtService() {
   const repository = createDebtRepository();

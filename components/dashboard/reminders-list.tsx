@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRef } from 'react';
-import { Animated, Pressable, Text, View } from 'react-native';
+import { Animated, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];

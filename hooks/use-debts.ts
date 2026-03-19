@@ -1,7 +1,7 @@
-import { useCallback } from 'react';
-import { useDebtStore } from '@/state/debt.store';
 import { createDebtService } from '@/modules/debt/debt.service';
 import type { CreateDebtInput, UpdateDebtInput } from '@/modules/debt/debt.types';
+import { useDebtStore } from '@/state/debt.store';
+import { useCallback } from 'react';
 
 export function useDebts() {
   const fetch = useCallback(async () => {

@@ -1,5 +1,5 @@
-import { create } from 'zustand';
 import type { Debt } from '@/modules/debt';
+import { create } from 'zustand';
 
 interface DebtState {
   debts: Debt[];

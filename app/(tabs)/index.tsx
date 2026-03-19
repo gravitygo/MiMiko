@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import type { ReminderItem, ReminderType } from '@/components/dashboard';
 import {
   BalanceCard,
   BudgetSummaryCard,
@@ -12,17 +13,16 @@ import {
   RecentTransactionItem,
   RemindersList,
 } from '@/components/dashboard';
-import type { ReminderItem, ReminderType } from '@/components/dashboard';
 import { useAccounts } from '@/hooks/use-accounts';
 import { useBudgets } from '@/hooks/use-budgets';
 import { useCategories } from '@/hooks/use-categories';
 import { useDebts } from '@/hooks/use-debts';
 import { useRecurring } from '@/hooks/use-recurring';
 import { useTransactions } from '@/hooks/use-transactions';
+import { createDebtService } from '@/modules/debt/debt.service';
 import { calculateNextDate } from '@/modules/recurring/recurring.model';
 import { createRecurringService } from '@/modules/recurring/recurring.service';
 import { createTransactionService } from '@/modules/transaction/transaction.service';
-import { createDebtService } from '@/modules/debt/debt.service';
 import { useAccountStore } from '@/state/account.store';
 import { useBudgetStore } from '@/state/budget.store';
 import { useCategoryStore } from '@/state/category.store';
