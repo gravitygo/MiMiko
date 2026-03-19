@@ -1,27 +1,27 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
-import { router } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
-import { useCategoryStore } from '@/state/category.store';
-import { useAccountStore } from '@/state/account.store';
-import { useTransactions } from '@/hooks/use-transactions';
-import { useCategories } from '@/hooks/use-categories';
 import { useAccounts } from '@/hooks/use-accounts';
-import type { TransactionType } from '@/modules/transaction/transaction.types';
-import type { Category } from '@/modules/category/category.types';
+import { useCategories } from '@/hooks/use-categories';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTransactions } from '@/hooks/use-transactions';
 import type { Account } from '@/modules/account/account.types';
+import type { Category } from '@/modules/category/category.types';
+import type { TransactionType } from '@/modules/transaction/transaction.types';
+import { useAccountStore } from '@/state/account.store';
+import { useCategoryStore } from '@/state/category.store';
 
 type TabType = 'expense' | 'income';
 
@@ -277,7 +277,7 @@ export default function AddTransactionScreen() {
           <Text className="text-text-secondary dark:text-text-secondary-dark text-sm font-medium mb-2 mx-4">
             Category
           </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-4">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
             <View className="flex-row flex-wrap">
               {filteredCategories.map((category) => (
                 <CategoryItem
@@ -296,7 +296,7 @@ export default function AddTransactionScreen() {
           <Text className="text-text-secondary dark:text-text-secondary-dark text-sm font-medium mb-2 mx-4">
             Account
           </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-4">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
             <View className="flex-row">
               {accounts.map((account) => (
                 <AccountItem

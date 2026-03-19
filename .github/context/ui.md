@@ -81,7 +81,9 @@ Location: `components/dashboard/`
 
 ### Budgets (`app/(tabs)/budgets.tsx`)
 - Budget list with progress indicators
-- Add/edit budget modal functionality
+- Add/edit budget modal with Monthly vs Category type selector
+- Category picker (horizontal scroll) when type is "category"
+- Auto-names budget from selected category
 - Alert level visualization (safe/warning/exceeded)
 - Overview header with total budget stats
 - Safe area insets (top + bottom for floating nav)
@@ -98,6 +100,14 @@ Location: `components/dashboard/`
 - Full-screen modal (Stack.Screen)
 - List of categories with icons and colors
 - Add/edit category modal
+
+### Recurring Payments (`app/recurring.tsx`)
+- Full-screen route (Stack.Screen)
+- FlatList of recurring rules with status badge (Active/Paused)
+- Shows category icon, frequency, next date, amount
+- Empty state with CTA to create first rule
+- Create modal: type (expense/income), name, amount, description, frequency picker, next date, category picker, account picker
+- Navigable from Settings > Account section
 - Icon picker grid using CATEGORY_ICONS array
 - Color picker for category colors
 - Delete category with confirmation

@@ -5,11 +5,11 @@ import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
-    BalanceCard,
-    BudgetSummaryCard,
-    CategoryCard,
-    QuickAddCard,
-    RecentTransactionItem,
+  BalanceCard,
+  BudgetSummaryCard,
+  CategoryCard,
+  QuickAddCard,
+  RecentTransactionItem,
 } from '@/components/dashboard';
 import { useAccounts } from '@/hooks/use-accounts';
 import { useBudgets } from '@/hooks/use-budgets';
@@ -22,10 +22,6 @@ import { useTransactionStore } from '@/state/transaction.store';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-// Mock sparkline data for demonstration
-const MOCK_SPARKLINE = [2400, 1800, 3200, 2800, 3600, 3100, 4200];
-
-// Bottom nav bar height + padding
 const BOTTOM_NAV_HEIGHT = 100;
 
 export default function HomeScreen() {
@@ -33,24 +29,20 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  // Hooks
   const { fetch: fetchTransactions } = useTransactions();
   const { fetch: fetchCategories } = useCategories();
   const { fetch: fetchAccounts } = useAccounts();
   const { fetchStatuses: fetchBudgetStatuses } = useBudgets();
 
-  // Stores
   const accounts = useAccountStore((state) => state.accounts);
   const transactions = useTransactionStore((state) => state.transactions);
   const categories = useCategoryStore((state) => state.categories);
   const budgetStatuses = useBudgetStore((state) => state.statuses);
 
-  // Calculate total balance from all accounts
   const totalBalance = useMemo(() => {
     return accounts.reduce((sum, account) => sum + account.balance, 0);
   }, [accounts]);
 
-  // Calculate income and expense for current month
   const { monthlyIncome, monthlyExpense } = useMemo(() => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -70,11 +62,25 @@ export default function HomeScreen() {
     );
   }, [transactions]);
 
-  // Get top spending categories
+  // Build sparkline from last 7 days of net daily spend
+  const sparklineData = useMemo(() => {
+    const days: number[] = [];
+    const today = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayTotal = transactions
+        .filter((t) => t.date.startsWith(dateStr) && t.type === 'expense')
+        .reduce((sum, t) => sum + t.amount, 0);
+      days.push(dayTotal);
+    }
+    return days;
+  }, [transactions]);
+
   const topCategories = useMemo(() => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-
     const categorySpending: Record<string, number> = {};
 
     transactions.forEach((t) => {
@@ -89,7 +95,6 @@ export default function HomeScreen() {
       .map(([categoryId, amount]) => {
         const category = categories.find((c) => c.id === categoryId);
         if (!category) return null;
-
         return {
           id: categoryId,
           name: category.name,
@@ -104,7 +109,6 @@ export default function HomeScreen() {
       .slice(0, 4);
   }, [transactions, categories]);
 
-  // Get recent transactions
   const recentTransactions = useMemo(() => {
     return transactions
       .slice()
@@ -121,16 +125,13 @@ export default function HomeScreen() {
       });
   }, [transactions, categories]);
 
-  // Format date for display
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-
     if (date.toDateString() === today.toDateString()) return 'Today';
     if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
-
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
@@ -152,17 +153,6 @@ export default function HomeScreen() {
     await loadData();
     setRefreshing(false);
   }, [loadData]);
-
-  const handleSeeAllTransactions = () => {
-    router.push('/transactions');
-  };
-
-  const handleTransactionPress = (transactionId: string) => {
-    // TODO: Navigate to transaction detail or show modal
-    router.push(`/transactions?highlight=${transactionId}`);
-  };
-
-
 
   return (
     <ScrollView
@@ -195,45 +185,54 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      {/* Balance Card - Large 2x2 */}
+      {/* Balance Card */}
       <BalanceCard
         totalBalance={totalBalance}
         income={monthlyIncome}
         expense={monthlyExpense}
-        sparklineData={MOCK_SPARKLINE}
+        sparklineData={sparklineData}
       />
 
-      {/* Quick Add Card - Medium 2x1 */}
+      {/* Quick Add Card */}
       <View className="mt-4">
         <QuickAddCard />
       </View>
 
-      {/* Category Spending - 2 Column Grid */}
+      {/* Top Categories */}
       <View className="mt-6">
         <Text className="text-text-primary dark:text-text-primary-dark text-lg font-bold tracking-tight mb-3">
           Top Categories
         </Text>
-        <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-          {topCategories.map((cat) => (
-            <View key={cat?.id} style={{ width: '50%', paddingHorizontal: 6, marginBottom: 12 }}>
-              <CategoryCard
-                name={cat?.name || ''}
-                icon={cat?.icon || 'help-circle'}
-                color={cat?.color || '#888'}
-                percentage={cat?.percentage || 0}
-                amount={cat?.amount || 0}
-              />
-            </View>
-          ))}
-        </View>
+        {topCategories.length > 0 ? (
+          <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
+            {topCategories.map((cat) => (
+              <View key={cat?.id} style={{ width: '50%', paddingHorizontal: 6, marginBottom: 12 }}>
+                <CategoryCard
+                  name={cat?.name || ''}
+                  icon={cat?.icon || 'help-circle'}
+                  color={cat?.color || '#888'}
+                  percentage={cat?.percentage || 0}
+                  amount={cat?.amount || 0}
+                />
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View className="bg-surface dark:bg-surface-dark border border-border/50 dark:border-white/5 rounded-3xl p-6 items-center">
+            <Ionicons name="grid-outline" size={32} color="#71717A" />
+            <Text className="text-text-muted dark:text-text-muted-dark text-sm mt-2 text-center">
+              No spending this month yet.{'\n'}Add expenses to see category breakdown.
+            </Text>
+          </View>
+        )}
       </View>
 
-      {/* Budget Summary - 2 Column Grid */}
-      {budgetStatuses.length > 0 && (
-        <View className="mt-6">
-          <Text className="text-text-primary dark:text-text-primary-dark text-lg font-bold tracking-tight mb-3">
-            Budget Overview
-          </Text>
+      {/* Budget Summary */}
+      <View className="mt-6">
+        <Text className="text-text-primary dark:text-text-primary-dark text-lg font-bold tracking-tight mb-3">
+          Budget Overview
+        </Text>
+        {budgetStatuses.length > 0 ? (
           <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
             {budgetStatuses.slice(0, 2).map((status) => (
               <View key={status.budget.id} style={{ width: '50%', paddingHorizontal: 6, marginBottom: 12 }}>
@@ -247,8 +246,18 @@ export default function HomeScreen() {
               </View>
             ))}
           </View>
-        </View>
-      )}
+        ) : (
+          <Pressable
+            onPress={() => router.push('/budgets')}
+            className="bg-surface dark:bg-surface-dark border border-border/50 dark:border-white/5 rounded-3xl p-6 items-center active:opacity-70"
+          >
+            <Ionicons name="pie-chart-outline" size={32} color="#71717A" />
+            <Text className="text-text-muted dark:text-text-muted-dark text-sm mt-2 text-center">
+              No budgets set up yet.{'\n'}Tap to create your first budget.
+            </Text>
+          </Pressable>
+        )}
+      </View>
 
       {/* Recent Transactions */}
       <View className="mt-6">
@@ -256,30 +265,44 @@ export default function HomeScreen() {
           <Text className="text-text-primary dark:text-text-primary-dark text-lg font-bold tracking-tight">
             Recent Transactions
           </Text>
-          <Pressable onPress={handleSeeAllTransactions} className="active:opacity-70">
-            <Text className="text-primary text-sm font-medium">See All</Text>
-          </Pressable>
+          {recentTransactions.length > 0 && (
+            <Pressable onPress={() => router.push('/transactions')} className="active:opacity-70">
+              <Text className="text-primary text-sm font-medium">See All</Text>
+            </Pressable>
+          )}
         </View>
 
-        <View className="bg-surface dark:bg-surface-dark border border-border/50 dark:border-white/5 rounded-3xl px-4">
-          {recentTransactions.map((transaction, index, arr) => (
-            <View key={transaction.id}>
-              <RecentTransactionItem
-                description={transaction.description || ''}
-                amount={transaction.amount}
-                type={transaction.type}
-                categoryName={transaction.categoryName}
-                categoryIcon={transaction.categoryIcon}
-                categoryColor={transaction.categoryColor}
-                date={formatDate(transaction.date)}
-                onPress={() => handleTransactionPress(transaction.id)}
-              />
-              {index < arr.length - 1 && (
-                <View className="h-px bg-border/50 dark:bg-white/5" />
-              )}
-            </View>
-          ))}
-        </View>
+        {recentTransactions.length > 0 ? (
+          <View className="bg-surface dark:bg-surface-dark border border-border/50 dark:border-white/5 rounded-3xl px-4">
+            {recentTransactions.map((transaction, index, arr) => (
+              <View key={transaction.id}>
+                <RecentTransactionItem
+                  description={transaction.description || ''}
+                  amount={transaction.amount}
+                  type={transaction.type}
+                  categoryName={transaction.categoryName}
+                  categoryIcon={transaction.categoryIcon}
+                  categoryColor={transaction.categoryColor}
+                  date={formatDate(transaction.date)}
+                  onPress={() => router.push(`/transactions?highlight=${transaction.id}`)}
+                />
+                {index < arr.length - 1 && (
+                  <View className="h-px bg-border/50 dark:bg-white/5" />
+                )}
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => router.push('/add')}
+            className="bg-surface dark:bg-surface-dark border border-border/50 dark:border-white/5 rounded-3xl p-6 items-center active:opacity-70"
+          >
+            <Ionicons name="receipt-outline" size={32} color="#71717A" />
+            <Text className="text-text-muted dark:text-text-muted-dark text-sm mt-2 text-center">
+              No transactions yet.{'\n'}Tap to add your first one.
+            </Text>
+          </Pressable>
+        )}
       </View>
     </ScrollView>
   );

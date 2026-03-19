@@ -31,19 +31,19 @@ UI → Hooks → Service → Repository → Database
 
 ### ✅ Completed (Frontend)
 - `app/(tabs)/_layout.tsx` - Tab navigator
-- `app/(tabs)/index.tsx` - Dashboard (loads real data from DB on mount + pull-to-refresh)
+- `app/(tabs)/index.tsx` - Dashboard (real sparkline from last 7 days, empty state placeholders, DB-connected)
 - `app/(tabs)/transactions.tsx` - Full transaction list (DB-connected)
 - `app/(tabs)/add.tsx` - Add transaction form (DB-connected)
-- `app/(tabs)/budgets.tsx` - Budgets screen (DB-connected, create budget works)
-- `app/(tabs)/settings.tsx` - Settings screen
+- `app/(tabs)/budgets.tsx` - Budgets screen (category picker for category-type budgets, explanations, DB-connected)
+- `app/(tabs)/settings.tsx` - Settings screen (links to accounts, categories, recurring)
 - `app/accounts.tsx` - Account management (CRUD, DB-connected)
 - `app/categories.tsx` - Category management (CRUD, DB-connected)
+- `app/recurring.tsx` - Recurring payments (list, create modal, category/account/frequency pickers, DB-connected)
 - `components/dashboard/` - Dashboard components (BalanceCard, QuickAddCard, CategoryCard, BudgetSummaryCard, RecentTransactionItem)
 
 ### ❌ Not Started
 - Voice module
 - AI module
-- Stack navigator routes for `accounts` and `categories` screens
 
 ---
 

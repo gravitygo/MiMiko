@@ -1,10 +1,10 @@
-import { View, Text, ScrollView, Pressable } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -108,6 +108,13 @@ export default function SettingsScreen() {
             title="Categories"
             subtitle="Customize categories"
             onPress={() => router.push('/categories')}
+          />
+          <Divider />
+          <SettingsItem
+            icon="repeat-outline"
+            title="Recurring Payments"
+            subtitle="Subscriptions & installments"
+            onPress={() => router.push('/recurring')}
           />
         </SettingsSection>
 
