@@ -29,11 +29,11 @@ Location: `components/dashboard/`
 - `QuickAddCard`: medium 2x1 shortcut (removed from dashboard)
 
 ### category-card.tsx
-- `CategoryCard`: small 1x1 card for category spending
+- `CategoryCard`: small 1x1 card for category spending (unused on dashboard now)
 - shows icon, percentage bar, amount
 
 ### budget-summary-card.tsx
-- `BudgetSummaryCard`: small 1x1 budget status card
+- `BudgetSummaryCard`: small 1x1 budget status card (unused on dashboard now)
 - shows spent/total with progress bar
 - color-coded by alert level (safe/warning/exceeded)
 
@@ -49,12 +49,28 @@ Location: `components/budgets/`
 
 ### category-pie-chart.tsx
 - `CategoryPieChart`: donut chart showing expense breakdown by category
+- accepts optional `budgetAmount` prop to show budget context
+- when budget set: shows remaining/excess in center, gray "remaining" slice
+- when over budget: center shows overspend amount in red
 - uses react-native-svg (Svg, Path, Circle)
-- shows legend with category name, percentage, amount
-- center label shows total spent
 
 ### budget-card.tsx, budget-overview-header.tsx, etc.
 - Standard budget display components
+
+---
+
+## Dashboard Layout (index.tsx)
+- Balance Card
+- Reminders (swipeable recurring + debts)
+- Top Categories: compact ranked list (top 5, not grid)
+- Budget Overview: single full-width monthly budget card
+- Recent Transactions
+
+## Budgets Screen Layout (budgets.tsx)
+- Monthly Budget card at top (set/edit, enforced single)
+- Pie chart with budget context (remaining/excess)
+- Category budget cards below
+- Add category budget button (only if monthly budget set)
 
 ---
 

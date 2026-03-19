@@ -1,12 +1,12 @@
+import { createTransactionRepository } from '@/modules/transaction/transaction.repository';
 import { createBudget, createBudgetStatus, getMonthDateRange } from './budget.model';
 import { createBudgetRepository } from './budget.repository';
-import { createTransactionRepository } from '@/modules/transaction/transaction.repository';
 import type {
-  Budget,
-  BudgetStatus,
-  BudgetType,
-  CreateBudgetInput,
-  UpdateBudgetInput,
+    Budget,
+    BudgetStatus,
+    BudgetType,
+    CreateBudgetInput,
+    UpdateBudgetInput,
 } from './budget.types';
 
 export function createBudgetService() {
@@ -15,6 +15,13 @@ export function createBudgetService() {
 
   return {
     async add(input: CreateBudgetInput): Promise<Budget> {
+      if (input.type === 'monthly') {
+        const existing = await repository.findMonthlyBudget(input.startDate, input.endDate);
+        if (existing) {
+          const updated = await this.edit(existing.id, { amount: input.amount, name: input.name });
+          return updated!;
+        }
+      }
       const budget = createBudget(input);
       await repository.insert(budget);
       return budget;

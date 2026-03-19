@@ -12,6 +12,7 @@ interface CategorySlice {
 interface CategoryPieChartProps {
   slices: CategorySlice[];
   totalSpent: number;
+  budgetAmount?: number;
 }
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
@@ -40,7 +41,7 @@ const RADIUS = 75;
 const CENTER = CHART_SIZE / 2;
 const INNER_RADIUS = 45;
 
-export function CategoryPieChart({ slices, totalSpent }: CategoryPieChartProps) {
+export function CategoryPieChart({ slices, totalSpent, budgetAmount }: CategoryPieChartProps) {
   if (slices.length === 0) {
     return (
       <View className="bg-surface dark:bg-surface-dark border border-border/50 dark:border-white/5 rounded-3xl p-6 items-center">
@@ -52,8 +53,12 @@ export function CategoryPieChart({ slices, totalSpent }: CategoryPieChartProps) 
   }
 
   let currentAngle = 0;
+  const hasBudget = budgetAmount !== undefined && budgetAmount > 0;
+  const isOverBudget = hasBudget && totalSpent > budgetAmount;
+  const base = hasBudget ? Math.max(totalSpent, budgetAmount) : totalSpent;
+
   const paths = slices.map((slice) => {
-    const angle = (slice.percentage / 100) * 360;
+    const angle = base > 0 ? (slice.amount / base) * 360 : 0;
     if (angle <= 0) return null;
 
     const startAngle = currentAngle;
@@ -68,6 +73,26 @@ export function CategoryPieChart({ slices, totalSpent }: CategoryPieChartProps) 
       />
     );
   });
+
+  // Remaining budget slice (gray)
+  if (hasBudget && !isOverBudget && currentAngle < 360) {
+    const remainAngle = 360 - currentAngle;
+    if (remainAngle > 0.5) {
+      paths.push(
+        <Path
+          key="remaining"
+          d={describeArc(CENTER, CENTER, RADIUS, currentAngle, currentAngle + Math.min(remainAngle, 359.99))}
+          fill="#E5E7EB"
+          opacity={0.4}
+        />
+      );
+    }
+  }
+
+  const centerLabel = hasBudget
+    ? (isOverBudget ? `$${(totalSpent - budgetAmount).toLocaleString()} over` : `$${(budgetAmount - totalSpent).toLocaleString()} left`)
+    : `$${totalSpent.toLocaleString()}`;
+  const centerSublabel = hasBudget ? `of $${budgetAmount.toLocaleString()}` : 'Total';
 
   return (
     <View className="bg-surface dark:bg-surface-dark border border-border/50 dark:border-white/5 rounded-3xl p-4">
@@ -86,10 +111,17 @@ export function CategoryPieChart({ slices, totalSpent }: CategoryPieChartProps) 
             alignItems: 'center',
           }}
         >
-          <Text className="text-text-muted dark:text-text-muted-dark text-xs">Total</Text>
-          <Text className="text-text-primary dark:text-text-primary-dark text-lg font-bold">
-            ${totalSpent.toLocaleString()}
+          <Text className="text-text-muted dark:text-text-muted-dark text-xs">{centerSublabel}</Text>
+          <Text className={`text-lg font-bold ${isOverBudget ? 'text-expense' : 'text-text-primary dark:text-text-primary-dark'}`}>
+            {hasBudget
+              ? (isOverBudget ? `$${(totalSpent - budgetAmount).toLocaleString()}` : `$${(budgetAmount - totalSpent).toLocaleString()}`)
+              : `$${totalSpent.toLocaleString()}`}
           </Text>
+          {hasBudget && (
+            <Text className={`text-xs font-medium ${isOverBudget ? 'text-expense' : 'text-secondary'}`}>
+              {isOverBudget ? 'over' : 'left'}
+            </Text>
+          )}
         </View>
       </View>
 

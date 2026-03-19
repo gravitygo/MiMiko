@@ -91,6 +91,8 @@ export const DEFAULT_CATEGORIES = [
   { id: 'cat_utilities', name: 'Utilities', icon: 'flash', color: '#FFE66D', type: 'expense' as const },
   { id: 'cat_health', name: 'Health', icon: 'medical', color: '#FF8B94', type: 'expense' as const },
   { id: 'cat_subscriptions', name: 'Subscriptions', icon: 'repeat', color: '#A8E6CF', type: 'expense' as const },
+  { id: 'cat_investment', name: 'Investment', icon: 'trending-up', color: '#6C5CE7', type: 'expense' as const },
+  { id: 'cat_savings', name: 'Savings', icon: 'shield-checkmark', color: '#00B894', type: 'expense' as const },
   { id: 'cat_salary', name: 'Salary', icon: 'wallet', color: '#05DF72', type: 'income' as const },
   { id: 'cat_freelance', name: 'Freelance', icon: 'briefcase', color: '#0084D1', type: 'income' as const },
   { id: 'cat_gifts', name: 'Gifts', icon: 'gift', color: '#FFB6C1', type: 'income' as const },

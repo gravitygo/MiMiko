@@ -13,6 +13,8 @@ import {
   View,
 } from 'react-native';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { DatePickerField } from '@/components/ui/date-picker-field';
 import { Colors } from '@/constants/theme';
 import { useAccounts } from '@/hooks/use-accounts';
@@ -116,6 +118,7 @@ function AccountItem({ account, selected, onPress }: AccountItemProps) {
 export default function AddTransactionScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
 
   const [activeTab, setActiveTab] = useState<TabType>('expense');
   const [amount, setAmount] = useState('');
@@ -265,7 +268,11 @@ export default function AddTransactionScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       className="flex-1 bg-background dark:bg-background-dark"
     >
-      <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
+      <ScrollView
+        className="flex-1"
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+      >
         {/* Tab Switcher */}
         <View className="flex-row mx-4 mt-4 p-1 bg-surface dark:bg-surface-dark rounded-bento">
           <Pressable
@@ -415,6 +422,56 @@ export default function AddTransactionScreen() {
           </>
         )}
 
+        {/* Category Selection (all tabs) */}
+        <View className="mt-6">
+          <View className="flex-row items-center justify-between mx-4 mb-2">
+            <Text className="text-text-secondary dark:text-text-secondary-dark text-sm font-medium">
+              Category{activeTab === 'owe' ? ' (optional)' : ''}
+            </Text>
+            <Pressable onPress={() => router.push('/categories')}>
+              <Text style={{ color: colors.tint }} className="text-sm font-medium">Manage</Text>
+            </Pressable>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+            <View className="flex-row flex-wrap">
+              {filteredCategories.map((category) => (
+                <CategoryItem
+                  key={category.id}
+                  category={category}
+                  selected={selectedCategoryId === category.id}
+                  onPress={() => setSelectedCategoryId(category.id)}
+                />
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+
+        {/* Account Selection (expense/income only) */}
+        {activeTab !== 'owe' && (
+          <View className="mt-6">
+            <View className="flex-row items-center justify-between mx-4 mb-2">
+              <Text className="text-text-secondary dark:text-text-secondary-dark text-sm font-medium">
+                Account
+              </Text>
+              <Pressable onPress={() => router.push('/accounts')}>
+                <Text style={{ color: colors.tint }} className="text-sm font-medium">Manage</Text>
+              </Pressable>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+              <View className="flex-row">
+                {accounts.map((account) => (
+                  <AccountItem
+                    key={account.id}
+                    account={account}
+                    selected={selectedAccountId === account.id}
+                    onPress={() => setSelectedAccountId(account.id)}
+                  />
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        )}
+
         {/* Recurring Toggle (expense/income only) */}
         {activeTab !== 'owe' && (
           <>
@@ -473,58 +530,6 @@ export default function AddTransactionScreen() {
                 />
               </View>
             )}
-          </>
-        )}
-
-        {/* Category Selection */}
-        {activeTab !== 'owe' && (
-          <>
-            <View className="mt-6">
-              <View className="flex-row items-center justify-between mx-4 mb-2">
-                <Text className="text-text-secondary dark:text-text-secondary-dark text-sm font-medium">
-                  Category
-                </Text>
-                <Pressable onPress={() => router.push('/categories')}>
-                  <Text style={{ color: colors.tint }} className="text-sm font-medium">Manage</Text>
-                </Pressable>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
-                <View className="flex-row flex-wrap">
-                  {filteredCategories.map((category) => (
-                    <CategoryItem
-                      key={category.id}
-                      category={category}
-                      selected={selectedCategoryId === category.id}
-                      onPress={() => setSelectedCategoryId(category.id)}
-                    />
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
-
-            {/* Account Selection */}
-            <View className="mt-6">
-              <View className="flex-row items-center justify-between mx-4 mb-2">
-                <Text className="text-text-secondary dark:text-text-secondary-dark text-sm font-medium">
-                  Account
-                </Text>
-                <Pressable onPress={() => router.push('/accounts')}>
-                  <Text style={{ color: colors.tint }} className="text-sm font-medium">Manage</Text>
-                </Pressable>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
-                <View className="flex-row">
-                  {accounts.map((account) => (
-                    <AccountItem
-                      key={account.id}
-                      account={account}
-                      selected={selectedAccountId === account.id}
-                      onPress={() => setSelectedAccountId(account.id)}
-                    />
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
           </>
         )}
 

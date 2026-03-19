@@ -1,5 +1,10 @@
 # Budget Module
 
+## Architecture
+- **1 monthly budget** = parent envelope (total spending limit)
+- **N category budgets** = sub-limits within monthly budget
+- Service enforces: only 1 monthly budget per month (upserts if exists)
+
 ## budget.types.ts
 - BudgetType: 'monthly' | 'category'
 - Budget: domain entity
@@ -20,7 +25,8 @@
 - findMonthlyBudget(): current monthly
 
 ## budget.service.ts
-- add() / edit() / remove()
+- add(): upserts monthly budget (enforces limit=1), creates category budgets
+- edit() / remove()
 - getById() / getAll() / getActive()
 - getStatus(): single budget progress
 - getCategoryBudgetStatus(): category progress

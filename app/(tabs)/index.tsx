@@ -8,8 +8,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ReminderItem, ReminderType } from '@/components/dashboard';
 import {
   BalanceCard,
-  BudgetSummaryCard,
-  CategoryCard,
   RecentTransactionItem,
   RemindersList,
 } from '@/components/dashboard';
@@ -56,6 +54,12 @@ export default function HomeScreen() {
   const totalBalance = useMemo(() => {
     return accounts.reduce((sum, account) => sum + account.balance, 0);
   }, [accounts]);
+
+  // Single monthly budget (parent of all category budgets)
+  const monthlyBudget = useMemo(
+    () => budgetStatuses.find((s) => s.budget.type === 'monthly') ?? null,
+    [budgetStatuses]
+  );
 
   const { monthlyIncome, monthlyExpense } = useMemo(() => {
     const now = new Date();
@@ -120,7 +124,7 @@ export default function HomeScreen() {
       })
       .filter(Boolean)
       .sort((a, b) => (b?.amount || 0) - (a?.amount || 0))
-      .slice(0, 4);
+      .slice(0, 5);
   }, [transactions, categories]);
 
   const recentTransactions = useMemo(() => {
@@ -341,22 +345,38 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Top Categories */}
+      {/* Top Categories — Compact Ranking */}
       <View className="mt-6">
         <Text className="text-text-primary dark:text-text-primary-dark text-lg font-bold tracking-tight mb-3">
           Top Categories
         </Text>
         {topCategories.length > 0 ? (
-          <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-            {topCategories.map((cat) => (
-              <View key={cat?.id} style={{ width: '50%', paddingHorizontal: 6, marginBottom: 12 }}>
-                <CategoryCard
-                  name={cat?.name || ''}
-                  icon={cat?.icon || 'help-circle'}
-                  color={cat?.color || '#888'}
-                  percentage={cat?.percentage || 0}
-                  amount={cat?.amount || 0}
-                />
+          <View className="bg-surface dark:bg-surface-dark border border-border/50 dark:border-white/5 rounded-3xl px-4 py-2">
+            {topCategories.map((cat, index) => (
+              <View key={cat?.id}>
+                <View className="flex-row items-center py-3">
+                  <Text className="text-text-muted dark:text-text-muted-dark text-xs font-bold w-5">
+                    {index + 1}
+                  </Text>
+                  <View
+                    className="w-8 h-8 rounded-full items-center justify-center mx-3"
+                    style={{ backgroundColor: `${cat?.color || '#888'}20` }}
+                  >
+                    <Ionicons name={cat?.icon || 'help-circle'} size={16} color={cat?.color || '#888'} />
+                  </View>
+                  <Text className="text-text-primary dark:text-text-primary-dark text-sm font-medium flex-1" numberOfLines={1}>
+                    {cat?.name}
+                  </Text>
+                  <Text className="text-text-primary dark:text-text-primary-dark text-sm font-semibold">
+                    ${(cat?.amount || 0).toLocaleString()}
+                  </Text>
+                  <Text className="text-text-muted dark:text-text-muted-dark text-xs ml-2 w-10 text-right">
+                    {(cat?.percentage || 0).toFixed(0)}%
+                  </Text>
+                </View>
+                {index < topCategories.length - 1 && (
+                  <View className="h-px bg-border/50 dark:bg-white/5" />
+                )}
               </View>
             ))}
           </View>
@@ -370,25 +390,68 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* Budget Summary */}
+      {/* Budget Overview — Single Monthly Budget */}
       <View className="mt-6">
-        <Text className="text-text-primary dark:text-text-primary-dark text-lg font-bold tracking-tight mb-3">
-          Budget Overview
-        </Text>
-        {budgetStatuses.length > 0 ? (
-          <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-            {budgetStatuses.slice(0, 2).map((status) => (
-              <View key={status.budget.id} style={{ width: '50%', paddingHorizontal: 6, marginBottom: 12 }}>
-                <BudgetSummaryCard
-                  name={status.budget.name}
-                  spent={status.spent}
-                  total={status.budget.amount}
-                  percentage={Math.round(status.percentage * 100)}
-                  alertLevel={status.alertLevel}
-                />
+        <View className="flex-row items-center justify-between mb-3">
+          <Text className="text-text-primary dark:text-text-primary-dark text-lg font-bold tracking-tight">
+            Budget Overview
+          </Text>
+          <Pressable onPress={() => router.push('/budgets')} className="active:opacity-70">
+            <Text className="text-primary text-sm font-medium">Details</Text>
+          </Pressable>
+        </View>
+        {monthlyBudget ? (
+          <Pressable
+            onPress={() => router.push('/budgets')}
+            className="bg-surface dark:bg-surface-dark border border-border/50 dark:border-white/5 rounded-3xl p-5 active:opacity-80"
+          >
+            <View className="flex-row items-center justify-between mb-3">
+              <View>
+                <Text className="text-text-muted dark:text-text-muted-dark text-xs">Monthly Budget</Text>
+                <Text className="text-text-primary dark:text-text-primary-dark text-2xl font-bold tracking-tight">
+                  ${monthlyBudget.budget.amount.toLocaleString()}
+                </Text>
               </View>
-            ))}
-          </View>
+              <View className={`px-3 py-1.5 rounded-full ${
+                monthlyBudget.alertLevel === 'exceeded' ? 'bg-expense/20' :
+                monthlyBudget.alertLevel === 'warning' ? 'bg-tertiary/20' : 'bg-secondary/20'
+              }`}>
+                <Text className={`text-sm font-bold ${
+                  monthlyBudget.alertLevel === 'exceeded' ? 'text-expense' :
+                  monthlyBudget.alertLevel === 'warning' ? 'text-tertiary' : 'text-secondary'
+                }`}>
+                  {Math.round(monthlyBudget.percentage * 100)}%
+                </Text>
+              </View>
+            </View>
+
+            <View className="h-3 bg-border dark:bg-border-dark rounded-full overflow-hidden mb-3">
+              <View
+                className={`h-full rounded-full ${
+                  monthlyBudget.alertLevel === 'exceeded' ? 'bg-expense' :
+                  monthlyBudget.alertLevel === 'warning' ? 'bg-tertiary' : 'bg-secondary'
+                }`}
+                style={{ width: `${Math.min(Math.round(monthlyBudget.percentage * 100), 100)}%` }}
+              />
+            </View>
+
+            <View className="flex-row justify-between">
+              <View>
+                <Text className="text-text-muted dark:text-text-muted-dark text-xs">Spent</Text>
+                <Text className="text-text-primary dark:text-text-primary-dark text-base font-semibold">
+                  ${monthlyBudget.spent.toLocaleString()}
+                </Text>
+              </View>
+              <View className="items-end">
+                <Text className="text-text-muted dark:text-text-muted-dark text-xs">
+                  {monthlyBudget.remaining > 0 ? 'Remaining' : 'Over Budget'}
+                </Text>
+                <Text className={`text-base font-semibold ${monthlyBudget.spent > monthlyBudget.budget.amount ? 'text-expense' : 'text-secondary'}`}>
+                  ${Math.abs(monthlyBudget.budget.amount - monthlyBudget.spent).toLocaleString()}
+                </Text>
+              </View>
+            </View>
+          </Pressable>
         ) : (
           <Pressable
             onPress={() => router.push('/budgets')}

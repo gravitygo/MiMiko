@@ -5,16 +5,14 @@ import { Alert, Modal, Pressable, RefreshControl, ScrollView, Text, TextInput, V
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
-    AddBudgetCard,
-    BudgetCard,
-    BudgetOverviewHeader,
-    CategoryPieChart,
-    EmptyBudgets,
+  AddBudgetCard,
+  BudgetCard,
+  BudgetOverviewHeader,
+  CategoryPieChart,
 } from '@/components/budgets';
 import { useBudgets } from '@/hooks/use-budgets';
 import { useCategories } from '@/hooks/use-categories';
 import { useTransactions } from '@/hooks/use-transactions';
-import type { BudgetType } from '@/modules/budget';
 import { getMonthDateRange } from '@/modules/budget';
 import { useBudgetStore } from '@/state/budget.store';
 import { useCategoryStore } from '@/state/category.store';
@@ -26,8 +24,11 @@ export default function BudgetsScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newBudgetName, setNewBudgetName] = useState('');
   const [newBudgetAmount, setNewBudgetAmount] = useState('');
-  const [newBudgetType, setNewBudgetType] = useState<BudgetType>('monthly');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
+  // Monthly budget inline edit
+  const [showMonthlyModal, setShowMonthlyModal] = useState(false);
+  const [monthlyAmount, setMonthlyAmount] = useState('');
 
   const { fetchStatuses, add: addBudget, edit: editBudget, remove: removeBudget } = useBudgets();
   const { fetch: fetchCategories } = useCategories();
@@ -42,7 +43,17 @@ export default function BudgetsScreen() {
     [categories]
   );
 
-  // Edit state
+  // Split monthly vs category budgets
+  const monthlyBudgetStatus = useMemo(
+    () => budgetStatuses.find((s) => s.budget.type === 'monthly') ?? null,
+    [budgetStatuses]
+  );
+  const categoryBudgetStatuses = useMemo(
+    () => budgetStatuses.filter((s) => s.budget.type === 'category'),
+    [budgetStatuses]
+  );
+
+  // Edit state (for category budgets)
   const [editBudgetId, setEditBudgetId] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editName, setEditName] = useState('');
@@ -59,19 +70,8 @@ export default function BudgetsScreen() {
     }, [loadData])
   );
 
-  const { totalBudget, totalSpent } = useMemo(() => {
-    return budgetStatuses.reduce(
-      (acc, status) => {
-        acc.totalBudget += status.budget.amount;
-        acc.totalSpent += status.spent;
-        return acc;
-      },
-      { totalBudget: 0, totalSpent: 0 }
-    );
-  }, [budgetStatuses]);
-
-  const displayBudgets = useMemo(() => {
-    return budgetStatuses.map((status) => {
+  const displayCategoryBudgets = useMemo(() => {
+    return categoryBudgetStatuses.map((status) => {
       const category = status.budget.categoryId
         ? categories.find((c) => c.id === status.budget.categoryId)
         : null;
@@ -87,7 +87,7 @@ export default function BudgetsScreen() {
         categoryColor: category?.color,
       };
     });
-  }, [budgetStatuses, categories]);
+  }, [categoryBudgetStatuses, categories]);
 
   const { pieSlices, pieTotalSpent } = useMemo(() => {
     const now = new Date();
@@ -130,32 +130,47 @@ export default function BudgetsScreen() {
     setShowAddModal(false);
     setNewBudgetName('');
     setNewBudgetAmount('');
-    setNewBudgetType('monthly');
     setSelectedCategoryId(null);
   }, []);
 
-  const handleSaveBudget = useCallback(async () => {
-    const parsedAmount = parseFloat(newBudgetAmount);
+  const handleSaveMonthlyBudget = useCallback(async () => {
+    const parsedAmount = parseFloat(monthlyAmount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) return;
-    if (newBudgetType === 'category' && !selectedCategoryId) return;
 
     const { startDate, endDate } = getMonthDateRange();
-    const budgetName = newBudgetType === 'category'
-      ? (newBudgetName.trim() || expenseCategories.find((c) => c.id === selectedCategoryId)?.name || 'Category Budget')
-      : (newBudgetName.trim() || 'Monthly Budget');
+    await addBudget({
+      name: 'Monthly Budget',
+      type: 'monthly',
+      amount: parsedAmount,
+      startDate,
+      endDate,
+    });
+
+    await fetchStatuses();
+    setShowMonthlyModal(false);
+    setMonthlyAmount('');
+  }, [monthlyAmount, addBudget, fetchStatuses]);
+
+  const handleSaveCategoryBudget = useCallback(async () => {
+    const parsedAmount = parseFloat(newBudgetAmount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) return;
+    if (!selectedCategoryId) return;
+
+    const { startDate, endDate } = getMonthDateRange();
+    const budgetName = newBudgetName.trim() || expenseCategories.find((c) => c.id === selectedCategoryId)?.name || 'Category Budget';
 
     await addBudget({
       name: budgetName,
-      type: newBudgetType,
+      type: 'category',
       amount: parsedAmount,
-      categoryId: newBudgetType === 'category' ? selectedCategoryId! : undefined,
+      categoryId: selectedCategoryId,
       startDate,
       endDate,
     });
 
     await fetchStatuses();
     resetModal();
-  }, [newBudgetName, newBudgetAmount, newBudgetType, selectedCategoryId, addBudget, fetchStatuses, resetModal, expenseCategories]);
+  }, [newBudgetName, newBudgetAmount, selectedCategoryId, addBudget, fetchStatuses, resetModal, expenseCategories]);
 
   const handleBudgetPress = useCallback((id: string) => {
     const status = budgetStatuses.find((s) => s.budget.id === id);
@@ -208,32 +223,55 @@ export default function BudgetsScreen() {
             <Text className="text-text-muted dark:text-text-muted-dark text-sm">Track your limits</Text>
             <Text className="text-text-primary dark:text-text-primary-dark text-2xl font-bold tracking-tight">Budgets</Text>
           </View>
-          <Pressable
-            onPress={() => setShowAddModal(true)}
-            className="w-10 h-10 rounded-full bg-primary items-center justify-center"
-          >
-            <Ionicons name="add" size={24} color="#FFFFFF" />
-          </Pressable>
         </View>
 
-        {/* Overview Header */}
-        {budgetStatuses.length > 0 && (
-          <BudgetOverviewHeader totalBudget={totalBudget} totalSpent={totalSpent} budgetCount={displayBudgets.length} />
+        {/* Monthly Budget Card */}
+        {monthlyBudgetStatus ? (
+          <Pressable
+            onPress={() => {
+              setMonthlyAmount(monthlyBudgetStatus.budget.amount.toString());
+              setShowMonthlyModal(true);
+            }}
+            className="active:opacity-80"
+          >
+            <BudgetOverviewHeader
+              totalBudget={monthlyBudgetStatus.budget.amount}
+              totalSpent={monthlyBudgetStatus.spent}
+              budgetCount={1}
+            />
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => setShowMonthlyModal(true)}
+            className="bg-surface dark:bg-surface-dark border border-dashed border-primary/40 rounded-3xl p-6 items-center active:opacity-70 mb-4"
+          >
+            <Ionicons name="wallet-outline" size={32} color="#6366F1" />
+            <Text className="text-text-primary dark:text-text-primary-dark text-base font-semibold mt-2">
+              Set Monthly Budget
+            </Text>
+            <Text className="text-text-muted dark:text-text-muted-dark text-sm mt-1 text-center">
+              Set a total spending limit for this month.
+            </Text>
+          </Pressable>
         )}
 
-        {/* Category Spending Breakdown */}
+        {/* Spending Breakdown Pie Chart */}
         <View className="mt-4 mb-4">
           <Text className="text-text-primary dark:text-text-primary-dark text-lg font-bold tracking-tight mb-3">
             Spending Breakdown
           </Text>
-          <CategoryPieChart slices={pieSlices} totalSpent={pieTotalSpent} />
+          <CategoryPieChart
+            slices={pieSlices}
+            totalSpent={pieTotalSpent}
+            budgetAmount={monthlyBudgetStatus?.budget.amount}
+          />
         </View>
 
-        {/* Budget List */}
-        {displayBudgets.length > 0 ? (
+        {/* Category Budgets List */}
+        {displayCategoryBudgets.length > 0 && (
           <View>
-            <Text className="text-text-primary dark:text-text-primary-dark text-lg font-bold tracking-tight mb-3">Active Budgets</Text>
-            {displayBudgets.map((budget) => (
+            <Text className="text-text-primary dark:text-text-primary-dark text-lg font-bold tracking-tight mb-3">Category Budgets</Text>
+            {displayCategoryBudgets.map((budget) => (
               <BudgetCard
                 key={budget.id}
                 id={budget.id}
@@ -249,88 +287,138 @@ export default function BudgetsScreen() {
               />
             ))}
           </View>
-        ) : (
-          <EmptyBudgets />
         )}
 
-        <View className="mt-4">
-          <AddBudgetCard onPress={() => setShowAddModal(true)} />
-        </View>
+        {/* Add Category Budget */}
+        {monthlyBudgetStatus && (
+          <View className="mt-4">
+            <AddBudgetCard onPress={() => setShowAddModal(true)} />
+          </View>
+        )}
       </ScrollView>
 
-      {/* Create Budget Modal */}
+      {/* Monthly Budget Modal */}
+      <Modal visible={showMonthlyModal} animationType="slide" transparent onRequestClose={() => setShowMonthlyModal(false)}>
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-surface dark:bg-surface-dark rounded-t-3xl p-6">
+            <View className="flex-row items-center justify-between mb-6">
+              <Text className="text-text-primary dark:text-text-primary-dark text-xl font-bold tracking-tight">
+                {monthlyBudgetStatus ? 'Edit Monthly Budget' : 'Set Monthly Budget'}
+              </Text>
+              <Pressable onPress={() => setShowMonthlyModal(false)} className="w-8 h-8 rounded-full bg-surface-hover dark:bg-surface-hover-dark items-center justify-center">
+                <Ionicons name="close" size={20} color="#71717A" />
+              </Pressable>
+            </View>
+
+            <Text className="text-text-muted dark:text-text-muted-dark text-xs mb-4">
+              This is your total spending limit for the month. Category budgets are sub-limits within this.
+            </Text>
+
+            <Text className="text-text-muted dark:text-text-muted-dark text-sm mb-2">Monthly Limit</Text>
+            <TextInput
+              value={monthlyAmount}
+              onChangeText={(t) => setMonthlyAmount(t.replace(/[^0-9.]/g, ''))}
+              placeholder="$0.00"
+              placeholderTextColor="#71717A"
+              keyboardType="numeric"
+              autoFocus
+              className="bg-surface-hover dark:bg-surface-hover-dark text-text-primary dark:text-text-primary-dark rounded-2xl px-4 py-3 mb-6"
+            />
+
+            <View className="flex-row">
+              {monthlyBudgetStatus && (
+                <Pressable
+                  onPress={() => {
+                    Alert.alert('Delete Monthly Budget', 'This will also affect your overview. Continue?', [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: async () => {
+                          await removeBudget(monthlyBudgetStatus.budget.id);
+                          setShowMonthlyModal(false);
+                          await fetchStatuses();
+                        },
+                      },
+                    ]);
+                  }}
+                  className="flex-1 py-4 rounded-2xl items-center mr-2"
+                  style={{ backgroundColor: '#FF6B6B20' }}
+                >
+                  <Text style={{ color: '#FF6B6B' }} className="font-semibold">Delete</Text>
+                </Pressable>
+              )}
+              <Pressable
+                onPress={handleSaveMonthlyBudget}
+                disabled={!monthlyAmount}
+                className={`flex-1 py-4 rounded-2xl items-center ${monthlyBudgetStatus ? 'ml-2' : ''} ${
+                  monthlyAmount ? 'bg-primary' : 'bg-surface-hover dark:bg-surface-hover-dark'
+                }`}
+              >
+                <Text className={`text-base font-semibold ${monthlyAmount ? 'text-white' : 'text-text-muted dark:text-text-muted-dark'}`}>
+                  {monthlyBudgetStatus ? 'Save' : 'Set Budget'}
+                </Text>
+              </Pressable>
+            </View>
+
+            <View className="h-6" />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Category Budget Modal */}
       <Modal visible={showAddModal} animationType="slide" transparent onRequestClose={resetModal}>
         <View className="flex-1 justify-end bg-black/50">
           <View className="bg-surface dark:bg-surface-dark rounded-t-3xl p-6">
             <View className="flex-row items-center justify-between mb-6">
-              <Text className="text-text-primary dark:text-text-primary-dark text-xl font-bold tracking-tight">Create Budget</Text>
+              <Text className="text-text-primary dark:text-text-primary-dark text-xl font-bold tracking-tight">Add Category Budget</Text>
               <Pressable onPress={resetModal} className="w-8 h-8 rounded-full bg-surface-hover dark:bg-surface-hover-dark items-center justify-center">
                 <Ionicons name="close" size={20} color="#71717A" />
               </Pressable>
             </View>
 
-            {/* Budget Type */}
-            <Text className="text-text-muted dark:text-text-muted-dark text-sm mb-2">Budget Type</Text>
-            <View className="flex-row mb-2">
-              <Pressable
-                onPress={() => { setNewBudgetType('monthly'); setSelectedCategoryId(null); }}
-                className={`flex-1 py-3 rounded-2xl mr-2 items-center ${newBudgetType === 'monthly' ? 'bg-primary' : 'bg-surface-hover dark:bg-surface-hover-dark'}`}
-              >
-                <Text className={newBudgetType === 'monthly' ? 'text-white font-semibold' : 'text-text-primary dark:text-text-primary-dark'}>Monthly</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setNewBudgetType('category')}
-                className={`flex-1 py-3 rounded-2xl ml-2 items-center ${newBudgetType === 'category' ? 'bg-primary' : 'bg-surface-hover dark:bg-surface-hover-dark'}`}
-              >
-                <Text className={newBudgetType === 'category' ? 'text-white font-semibold' : 'text-text-primary dark:text-text-primary-dark'}>Category</Text>
-              </Pressable>
-            </View>
             <Text className="text-text-muted dark:text-text-muted-dark text-xs mb-4">
-              {newBudgetType === 'monthly'
-                ? 'Tracks total spending across all categories this month.'
-                : 'Tracks spending for a specific category this month.'}
+              Set a spending limit for a specific category within your monthly budget.
             </Text>
 
-            {/* Category Picker (only for category type) */}
-            {newBudgetType === 'category' && (
-              <View className="mb-4">
-                <Text className="text-text-muted dark:text-text-muted-dark text-sm mb-2">Category</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View className="flex-row">
-                    {expenseCategories.map((cat) => {
-                      const isSelected = selectedCategoryId === cat.id;
-                      return (
-                        <Pressable
-                          key={cat.id}
-                          onPress={() => {
-                            setSelectedCategoryId(cat.id);
-                            if (!newBudgetName.trim()) setNewBudgetName(cat.name);
-                          }}
-                          className={`flex-row items-center px-3 py-2 rounded-2xl mr-2 ${isSelected ? 'bg-primary' : 'bg-surface-hover dark:bg-surface-hover-dark'}`}
+            {/* Category Picker */}
+            <View className="mb-4">
+              <Text className="text-text-muted dark:text-text-muted-dark text-sm mb-2">Category</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View className="flex-row">
+                  {expenseCategories.map((cat) => {
+                    const isSelected = selectedCategoryId === cat.id;
+                    return (
+                      <Pressable
+                        key={cat.id}
+                        onPress={() => {
+                          setSelectedCategoryId(cat.id);
+                          if (!newBudgetName.trim()) setNewBudgetName(cat.name);
+                        }}
+                        className={`flex-row items-center px-3 py-2 rounded-2xl mr-2 ${isSelected ? 'bg-primary' : 'bg-surface-hover dark:bg-surface-hover-dark'}`}
+                      >
+                        <View
+                          className="w-7 h-7 rounded-full items-center justify-center mr-2"
+                          style={{ backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : cat.color + '20' }}
                         >
-                          <View
-                            className="w-7 h-7 rounded-full items-center justify-center mr-2"
-                            style={{ backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : cat.color + '20' }}
-                          >
-                            <Ionicons name={cat.icon as any} size={14} color={isSelected ? '#FFFFFF' : cat.color} />
-                          </View>
-                          <Text className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-text-primary dark:text-text-primary-dark'}`}>
-                            {cat.name}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </ScrollView>
-              </View>
-            )}
+                          <Ionicons name={cat.icon as any} size={14} color={isSelected ? '#FFFFFF' : cat.color} />
+                        </View>
+                        <Text className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-text-primary dark:text-text-primary-dark'}`}>
+                          {cat.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            </View>
 
             {/* Name */}
             <Text className="text-text-muted dark:text-text-muted-dark text-sm mb-2">Name</Text>
             <TextInput
               value={newBudgetName}
               onChangeText={setNewBudgetName}
-              placeholder={newBudgetType === 'monthly' ? 'e.g., Monthly Budget' : 'e.g., Food & Dining'}
+              placeholder="e.g., Food & Dining"
               placeholderTextColor="#71717A"
               className="bg-surface-hover dark:bg-surface-hover-dark text-text-primary dark:text-text-primary-dark rounded-2xl px-4 py-3 mb-4"
             />
@@ -348,14 +436,14 @@ export default function BudgetsScreen() {
 
             {/* Save */}
             <Pressable
-              onPress={handleSaveBudget}
-              disabled={!newBudgetAmount || (newBudgetType === 'category' && !selectedCategoryId)}
+              onPress={handleSaveCategoryBudget}
+              disabled={!newBudgetAmount || !selectedCategoryId}
               className={`py-4 rounded-2xl items-center active:opacity-80 ${
-                newBudgetAmount && (newBudgetType === 'monthly' || selectedCategoryId) ? 'bg-primary' : 'bg-surface-hover dark:bg-surface-hover-dark'
+                newBudgetAmount && selectedCategoryId ? 'bg-primary' : 'bg-surface-hover dark:bg-surface-hover-dark'
               }`}
             >
               <Text className={`text-base font-semibold ${
-                newBudgetAmount && (newBudgetType === 'monthly' || selectedCategoryId) ? 'text-white' : 'text-text-muted dark:text-text-muted-dark'
+                newBudgetAmount && selectedCategoryId ? 'text-white' : 'text-text-muted dark:text-text-muted-dark'
               }`}>
                 Create Budget
               </Text>
