@@ -1,6 +1,6 @@
+import { useSettingsStore } from '@/state/settings.store';
 import { useEffect, useState } from 'react';
 import { useColorScheme as useRNColorScheme } from 'react-native';
-import { useSettingsStore } from '@/state/settings.store';
 
 export function useColorScheme() {
   const [hasHydrated, setHasHydrated] = useState(false);

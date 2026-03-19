@@ -1,5 +1,5 @@
-import { useColorScheme as useRNColorScheme } from 'react-native';
 import { useSettingsStore } from '@/state/settings.store';
+import { useColorScheme as useRNColorScheme } from 'react-native';
 
 export function useColorScheme() {
   const systemScheme = useRNColorScheme();

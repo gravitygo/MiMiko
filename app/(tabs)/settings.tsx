@@ -8,9 +8,8 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   CURRENCIES,
-  type AppearanceMode,
-  type CurrencyCode,
   useSettingsStore,
+  type AppearanceMode
 } from '@/state/settings.store';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -108,11 +107,6 @@ export default function SettingsScreen() {
         className="flex-1"
         contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 100 }}
       >
-        <View className="px-4 py-6">
-          <Text style={{ color: colors.text }} className="text-2xl font-bold">
-            Settings
-          </Text>
-        </View>
 
         <SettingsSection title="Account">
           <SettingsItem
