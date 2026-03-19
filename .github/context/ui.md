@@ -91,10 +91,11 @@ Location: `components/dashboard/`
 
 ### Add Transaction (`app/(tabs)/add.tsx`)
 - Transaction form with amount, description, date
-- Category picker with Ionicons grid
-- Account selector with Ionicons
+- Category picker with Ionicons grid + "Manage" link to /categories
+- Account selector with Ionicons + "Manage" link to /accounts
 - Type toggle (expense/income)
-- Date picker integration
+- Recurring toggle (Switch) — when on shows frequency picker + next date
+- On submit with recurring: creates both transaction + recurring rule
 
 ### Categories Management (`app/categories.tsx`)
 - Full-screen modal (Stack.Screen)

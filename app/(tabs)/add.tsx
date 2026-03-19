@@ -7,6 +7,7 @@ import {
     Platform,
     Pressable,
     ScrollView,
+    Switch,
     Text,
     TextInput,
     View,
@@ -16,14 +17,23 @@ import { Colors } from '@/constants/theme';
 import { useAccounts } from '@/hooks/use-accounts';
 import { useCategories } from '@/hooks/use-categories';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useRecurring } from '@/hooks/use-recurring';
 import { useTransactions } from '@/hooks/use-transactions';
 import type { Account } from '@/modules/account/account.types';
 import type { Category } from '@/modules/category/category.types';
+import type { RecurringFrequency } from '@/modules/recurring/recurring.types';
 import type { TransactionType } from '@/modules/transaction/transaction.types';
 import { useAccountStore } from '@/state/account.store';
 import { useCategoryStore } from '@/state/category.store';
 
 type TabType = 'expense' | 'income';
+
+const FREQUENCIES: { value: RecurringFrequency; label: string }[] = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'yearly', label: 'Yearly' },
+];
 
 interface CategoryItemProps {
   category: Category;
@@ -111,6 +121,9 @@ export default function AddTransactionScreen() {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [frequency, setFrequency] = useState<RecurringFrequency>('monthly');
+  const [nextDate, setNextDate] = useState(new Date().toISOString().split('T')[0]);
 
   const categories = useCategoryStore((s) => s.categories);
   const accounts = useAccountStore((s) => s.accounts);
@@ -118,6 +131,7 @@ export default function AddTransactionScreen() {
   const { fetch: fetchCategories } = useCategories();
   const { fetch: fetchAccounts } = useAccounts();
   const { add: addTransaction } = useTransactions();
+  const { add: addRecurringRule } = useRecurring();
 
   const filteredCategories = useMemo(
     () => categories.filter((c) => c.type === activeTab),
@@ -170,14 +184,28 @@ export default function AddTransactionScreen() {
       date: new Date().toISOString(),
     });
 
+    if (transaction && isRecurring) {
+      await addRecurringRule({
+        name: description.trim() || `Recurring ${activeTab}`,
+        type: activeTab,
+        amount: parsedAmount,
+        description: description.trim() || undefined,
+        categoryId: selectedCategoryId,
+        accountId: selectedAccountId,
+        frequency,
+        nextDate,
+      });
+    }
+
     setSubmitting(false);
 
     if (transaction) {
       setAmount('');
       setDescription('');
+      setIsRecurring(false);
       router.back();
     }
-  }, [amount, description, selectedCategoryId, selectedAccountId, activeTab, addTransaction]);
+  }, [amount, description, selectedCategoryId, selectedAccountId, activeTab, addTransaction, isRecurring, addRecurringRule, frequency, nextDate]);
 
   const canSubmit = useMemo(() => {
     const parsedAmount = parseFloat(amount);
@@ -272,11 +300,67 @@ export default function AddTransactionScreen() {
           />
         </View>
 
+        {/* Recurring Toggle */}
+        <View className="mx-4 mt-4">
+          <View className="flex-row items-center justify-between bg-surface dark:bg-surface-dark rounded-bento px-4 py-3">
+            <View className="flex-row items-center">
+              <Ionicons name="repeat" size={20} color={colors.tint} />
+              <Text className="text-text-primary dark:text-text-primary-dark font-medium ml-2">
+                Recurring
+              </Text>
+            </View>
+            <Switch
+              value={isRecurring}
+              onValueChange={setIsRecurring}
+              trackColor={{ false: colors.surfaceHover, true: colors.tint }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        </View>
+
+        {/* Recurring Options */}
+        {isRecurring && (
+          <View className="mx-4 mt-3">
+            <Text className="text-text-secondary dark:text-text-secondary-dark text-sm font-medium mb-2">
+              Frequency
+            </Text>
+            <View className="flex-row flex-wrap mb-3">
+              {FREQUENCIES.map((f) => (
+                <Pressable
+                  key={f.value}
+                  onPress={() => setFrequency(f.value)}
+                  className="mr-2 mb-2 px-4 py-2 rounded-bento-sm"
+                  style={{ backgroundColor: frequency === f.value ? colors.tint : colors.surfaceHover }}
+                >
+                  <Text className="font-medium" style={{ color: frequency === f.value ? '#FFFFFF' : colors.text }}>
+                    {f.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text className="text-text-secondary dark:text-text-secondary-dark text-sm font-medium mb-2">
+              Next Payment Date
+            </Text>
+            <TextInput
+              value={nextDate}
+              onChangeText={setNextDate}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={colors.textMuted}
+              className="bg-surface dark:bg-surface-dark rounded-bento px-4 py-3 text-text-primary dark:text-text-primary-dark"
+            />
+          </View>
+        )}
+
         {/* Category Selection */}
         <View className="mt-6">
-          <Text className="text-text-secondary dark:text-text-secondary-dark text-sm font-medium mb-2 mx-4">
-            Category
-          </Text>
+          <View className="flex-row items-center justify-between mx-4 mb-2">
+            <Text className="text-text-secondary dark:text-text-secondary-dark text-sm font-medium">
+              Category
+            </Text>
+            <Pressable onPress={() => router.push('/categories')}>
+              <Text style={{ color: colors.tint }} className="text-sm font-medium">Manage</Text>
+            </Pressable>
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
             <View className="flex-row flex-wrap">
               {filteredCategories.map((category) => (
@@ -293,9 +377,14 @@ export default function AddTransactionScreen() {
 
         {/* Account Selection */}
         <View className="mt-6">
-          <Text className="text-text-secondary dark:text-text-secondary-dark text-sm font-medium mb-2 mx-4">
-            Account
-          </Text>
+          <View className="flex-row items-center justify-between mx-4 mb-2">
+            <Text className="text-text-secondary dark:text-text-secondary-dark text-sm font-medium">
+              Account
+            </Text>
+            <Pressable onPress={() => router.push('/accounts')}>
+              <Text style={{ color: colors.tint }} className="text-sm font-medium">Manage</Text>
+            </Pressable>
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
             <View className="flex-row">
               {accounts.map((account) => (

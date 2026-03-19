@@ -70,6 +70,18 @@ Zustand stores for global UI state + hooks for service integration.
 
 ---
 
+### state/settings.store.ts
+
+- `useSettingsStore`
+- `appearance`: 'system' | 'light' | 'dark' (default: 'system')
+- `currency`: 'USD' | 'PHP' | 'IDR' (default: 'USD')
+- `setAppearance()`: change color scheme mode
+- `setCurrency()`: change currency
+- `getCurrencySymbol()`: helper to get symbol from code
+- `CURRENCIES`: exported constant with code, symbol, name
+
+---
+
 ## Hooks (Service Integration)
 
 ### hooks/use-transactions.ts
