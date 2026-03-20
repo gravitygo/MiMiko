@@ -4,6 +4,7 @@ const {
 } = require("expo/config-plugins");
 const fs = require("fs");
 const path = require("path");
+const DEFAULT_STRINGS_XML = "<resources>\n</resources>\n";
 
 /**
  * Expo config plugin that adds the MiKiko voice widget to the Android build.
@@ -17,16 +18,18 @@ function addWidgetReceiver(config) {
     if (!app) return cfg;
 
     // Check if receiver already exists
-    const receivers = (app.receiver ?? []).filter((r) => {
+    const currentReceivers = app.receiver ?? [];
+    const receivers = currentReceivers.filter((r) => {
       const name = r.$?.["android:name"];
       return name !== ".VoiceWidgetProvider";
     });
+    let modified = false;
+    if (receivers.length !== currentReceivers.length) {
+      modified = true;
+    }
     const exists = receivers.some((r) => {
       const name = r.$?.["android:name"];
-      return (
-        name === "com.voiceapp.widget.VoiceWidgetProvider" ||
-        name === ".widget.VoiceWidgetProvider"
-      );
+      return name === "com.voiceapp.widget.VoiceWidgetProvider";
     });
 
     if (!exists) {
@@ -56,6 +59,9 @@ function addWidgetReceiver(config) {
           },
         ],
       });
+      modified = true;
+    }
+    if (modified) {
       app.receiver = receivers;
     }
 
@@ -120,7 +126,7 @@ function copyWidgetFiles(config) {
       );
       if (!fs.existsSync(stringsPath)) {
         fs.mkdirSync(path.dirname(stringsPath), { recursive: true });
-        fs.writeFileSync(stringsPath, "<resources>\n</resources>\n", "utf8");
+        fs.writeFileSync(stringsPath, DEFAULT_STRINGS_XML, "utf8");
       }
 
       let content = fs.readFileSync(stringsPath, "utf8");
