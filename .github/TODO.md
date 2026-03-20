@@ -4,3 +4,4 @@ Recurring transactions should be undo-able till the first transaction. So from l
 I can't edit recurring expense/income I'm thinking long press = skip, tap = edit/delete(delete should just delete the recurring thing but would keep the transactions already swiped right), right pay, left, undo
 Insights on where the moneys are (drop down) is not moving the screen down. It's being blocked by reminders.
 Reminders should be chronological.
+Make me a widget for android (only the voice functionality.)
