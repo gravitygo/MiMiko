@@ -1,6 +1,6 @@
 import { getDatabase } from '@/database';
 import { mapRowToTransaction } from './transaction.mapper';
-import type { Transaction, TransactionRow, TransactionFilter } from './transaction.types';
+import type { Transaction, TransactionFilter, TransactionRow } from './transaction.types';
 
 export function createTransactionRepository() {
   return {
@@ -105,6 +105,15 @@ export function createTransactionRepository() {
       const rows = await db.getAllAsync<TransactionRow>(
         'SELECT * FROM transactions WHERE category_id = ? ORDER BY date DESC LIMIT ?',
         [categoryId, limit]
+      );
+      return rows.map(mapRowToTransaction);
+    },
+
+    async findByRecurringRuleId(recurringRuleId: string): Promise<Transaction[]> {
+      const db = await getDatabase();
+      const rows = await db.getAllAsync<TransactionRow>(
+        'SELECT * FROM transactions WHERE recurring_rule_id = ? ORDER BY date DESC',
+        [recurringRuleId]
       );
       return rows.map(mapRowToTransaction);
     },

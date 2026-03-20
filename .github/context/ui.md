@@ -10,23 +10,26 @@ Location: `components/dashboard/`
 
 ### bento-card.tsx
 - `BentoCard`: base container for Bento Box UI
-- sizes: `1x1`, `2x1`, `2x2`, `1x2`
+- sizes: `1x1`, `2x1`, `2x2`, `1x2`, `auto` (no fixed aspect ratio)
 - supports `onPress` for pressable cards
 
 ### balance-card.tsx
-- `BalanceCard`: large 2x2 card showing total balance
+- `BalanceCard`: auto-height card showing total balance (uses `size="auto"` to expand with content)
 - displays income/expense summary with current month label
 - shows ghost allocated "committed" amount + available balance
 - includes mini sparkline graph
-- **Account Breakdown**: tap total balance to expand/collapse per-account balances
-- accepts `accounts` prop for breakdown data
+- **Account Breakdown**: tap total balance to expand/collapse per-account balances (pushes content down)
+- uses `formatCurrency()` from settings store for dynamic currency
 
 ### reminders-list.tsx
 - `RemindersList`: vertical list of swipeable reminder cards
-- `ReminderCard`: swipe RIGHT = confirm (paid/received), swipe LEFT = undo/revert, long press = skip
+- `ReminderCard`: swipe RIGHT = confirm (paid/received), swipe LEFT = undo/revert, long press = skip, tap = navigate to edit
 - `canRevert` prop: yellow dot indicator when item has a reversible action
+- `onPress` callback: tap to navigate to edit screen
+- `dueDate` field: actual date for chronological sorting
 - shows recurring due items + unsettled debts
 - uses react-native-gesture-handler Swipeable + expo-haptics
+- all amounts use `formatCurrency()` from settings store
 
 ### quick-add-card.tsx
 - `QuickAddCard`: medium 2x1 shortcut (removed from dashboard)

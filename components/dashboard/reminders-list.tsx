@@ -4,6 +4,8 @@ import { useRef } from 'react';
 import { Animated, Pressable, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 
+import { formatCurrency } from '@/state/settings.store';
+
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 export type ReminderType = 'recurring' | 'debt';
@@ -16,6 +18,7 @@ export interface ReminderItem {
   amount: number;
   icon: IconName;
   iconColor: string;
+  dueDate: string | null;
   dueLabel: string;
   isOverdue: boolean;
   direction?: 'payable' | 'receivable';
@@ -27,6 +30,7 @@ interface ReminderCardProps {
   onConfirm: (id: string, type: ReminderType) => void;
   onRevert: (id: string, type: ReminderType) => void;
   onSkip: (id: string, type: ReminderType) => void;
+  onPress: (id: string, type: ReminderType) => void;
 }
 
 function renderRightAction(
@@ -85,7 +89,7 @@ function renderLeftAction(
   );
 }
 
-export function ReminderCard({ item, onConfirm, onRevert, onSkip }: ReminderCardProps) {
+export function ReminderCard({ item, onConfirm, onRevert, onSkip, onPress }: ReminderCardProps) {
   const swipeableRef = useRef<Swipeable>(null);
 
   const handleSwipeLeft = () => {
@@ -131,7 +135,11 @@ export function ReminderCard({ item, onConfirm, onRevert, onSkip }: ReminderCard
       overshootLeft={false}
       overshootRight={false}
     >
-      <Pressable onLongPress={handleLongPress} delayLongPress={800}>
+      <Pressable
+        onPress={() => onPress(item.id, item.type)}
+        onLongPress={handleLongPress}
+        delayLongPress={800}
+      >
         <View className="flex-row items-center bg-surface dark:bg-surface-dark rounded-2xl px-4 py-3">
           <View
             className="w-10 h-10 rounded-full items-center justify-center mr-3"
@@ -156,7 +164,7 @@ export function ReminderCard({ item, onConfirm, onRevert, onSkip }: ReminderCard
 
           <View className="items-end ml-2">
             <Text style={{ color: amountColor }} className="font-semibold text-sm">
-              {amountPrefix}${item.amount.toLocaleString()}
+              {amountPrefix}{formatCurrency(item.amount)}
             </Text>
             <Text
               className={`text-xs ${item.isOverdue ? 'text-expense' : 'text-text-muted dark:text-text-muted-dark'}`}
@@ -175,9 +183,10 @@ interface RemindersListProps {
   onConfirm: (id: string, type: ReminderType) => void;
   onRevert: (id: string, type: ReminderType) => void;
   onSkip: (id: string, type: ReminderType) => void;
+  onPress: (id: string, type: ReminderType) => void;
 }
 
-export function RemindersList({ items, onConfirm, onRevert, onSkip }: RemindersListProps) {
+export function RemindersList({ items, onConfirm, onRevert, onSkip, onPress }: RemindersListProps) {
   if (items.length === 0) return null;
 
   return (
@@ -189,6 +198,7 @@ export function RemindersList({ items, onConfirm, onRevert, onSkip }: RemindersL
           onConfirm={onConfirm}
           onRevert={onRevert}
           onSkip={onSkip}
+          onPress={onPress}
         />
       ))}
     </View>

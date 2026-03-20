@@ -1,7 +1,7 @@
-import { View, Pressable } from "react-native";
 import type { ReactNode } from "react";
+import { Pressable, View } from "react-native";
 
-type CardSize = "1x1" | "2x1" | "2x2" | "1x2" | "4x1" | "4x2" | "3x1" | "3x2";
+type CardSize = "1x1" | "2x1" | "2x2" | "1x2" | "4x1" | "4x2" | "3x1" | "3x2" | "auto";
 
 interface BentoCardProps {
   size?: CardSize;
@@ -19,6 +19,7 @@ const sizeClasses: Record<CardSize, string> = {
   "4x2": "w-full aspect-[2/1] ",
   "3x1": "w-full aspect-[3/1] ",
   "3x2": "w-full aspect-[3/2] ",
+  "auto": "w-full",
 };
 
 export function BentoCard({

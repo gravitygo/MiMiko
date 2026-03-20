@@ -50,6 +50,18 @@ Zustand stores for global UI state + hooks for service integration.
 
 ---
 
+### state/settings.store.ts
+
+- `useSettingsStore`
+- `setAppearance(mode)`: set light/dark/system
+- `setCurrency(code)`: set active currency
+- `getCurrencySymbol(code)`: get symbol for currency code
+- `formatCurrency(amount, code?)`: format amount with currency symbol (uses store currency if no code)
+- `formatSignedCurrency(amount, type, code?)`: format with +/- prefix based on expense/income
+- Supported currencies: USD ($), PHP (₱), IDR (Rp)
+
+---
+
 ### state/budget.store.ts
 
 - `useBudgetStore`

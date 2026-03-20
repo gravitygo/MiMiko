@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -24,6 +24,7 @@ import type { RecurringFrequency, RecurringRule, RecurringType, WeekDay } from '
 import { useAccountStore } from '@/state/account.store';
 import { useCategoryStore } from '@/state/category.store';
 import { useRecurringStore } from '@/state/recurring.store';
+import { formatCurrency } from '@/state/settings.store';
 
 const FREQUENCIES: { value: RecurringFrequency; label: string }[] = [
   { value: 'daily', label: 'Daily' },
@@ -96,7 +97,7 @@ function RuleItem({ rule, categoryName, categoryIcon, categoryColor, accountName
         </View>
       </View>
       <Text className={`text-base font-bold ${isExpense ? 'text-expense' : 'text-secondary'}`}>
-        {isExpense ? '-' : '+'}${rule.amount.toLocaleString()}
+        {isExpense ? '-' : '+'}{formatCurrency(rule.amount)}
       </Text>
     </Pressable>
   );
@@ -106,6 +107,7 @@ export default function RecurringScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
+  const { editId } = useLocalSearchParams<{ editId?: string }>();
 
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -154,6 +156,14 @@ export default function RecurringScreen() {
   useEffect(() => {
     Promise.all([fetchRules(), fetchCategories(), fetchAccounts()]).finally(() => setLoading(false));
   }, [fetchRules, fetchCategories, fetchAccounts]);
+
+  // Auto-open edit modal if navigated with editId param
+  useEffect(() => {
+    if (!loading && editId && rules.length > 0) {
+      const rule = rules.find((r) => r.id === editId);
+      if (rule) handleOpenEdit(rule);
+    }
+  }, [loading, editId, rules]);
 
   useEffect(() => {
     setSelectedCategoryId(null);

@@ -241,11 +241,19 @@ export default function VoiceScreen() {
   const matchedCategory = useMemo(() => {
     if (!parsedTx) return null;
     const lower = parsedTx.category.toLowerCase();
-    return (
-      categories.find((c) => c.name.toLowerCase() === lower) ??
-      categories.find((c) => c.type === 'expense') ??
-      null
+
+    // Exact match
+    const exact = categories.find((c) => c.name.toLowerCase() === lower);
+    if (exact) return exact;
+
+    // Partial/fuzzy match: category name contains parsed or parsed contains category name
+    const partial = categories.find(
+      (c) => c.name.toLowerCase().includes(lower) || lower.includes(c.name.toLowerCase()),
     );
+    if (partial) return partial;
+
+    // Fallback to first expense category
+    return categories.find((c) => c.type === 'expense') ?? null;
   }, [parsedTx, categories]);
 
   const defaultAccount = useMemo(

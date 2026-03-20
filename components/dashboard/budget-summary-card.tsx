@@ -1,9 +1,10 @@
-import { View, Text } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
+import { Text, View } from "react-native";
 
-import { BentoCard } from "./bento-card";
 import type { BudgetAlertLevel } from "@/modules/budget";
+import { formatCurrency } from '@/state/settings.store';
+import { BentoCard } from "./bento-card";
 
 interface BudgetSummaryCardProps {
   name: string;
@@ -66,10 +67,10 @@ export function BudgetSummaryCard({
       <View>
         <View className="flex-row items-baseline">
           <Text className={`text-lg font-bold tracking-tight ${colors.text}`}>
-            ${spent.toLocaleString()}
+            {formatCurrency(spent)}
           </Text>
           <Text className="text-text-muted dark:text-text-muted-dark text-sm ml-1">
-            / ${total.toLocaleString()}
+            / {formatCurrency(total)}
           </Text>
         </View>
 

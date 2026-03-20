@@ -26,6 +26,7 @@ import { useBudgetStore } from '@/state/budget.store';
 import { useCategoryStore } from '@/state/category.store';
 import { useDebtStore } from '@/state/debt.store';
 import { useRecurringStore } from '@/state/recurring.store';
+import { formatCurrency } from '@/state/settings.store';
 import { useTransactionStore } from '@/state/transaction.store';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -43,14 +44,17 @@ function formatFrequency(frequency: string, customDays?: number[] | null): strin
 
 interface UndoAction {
   action: 'confirm' | 'skip';
-  previousNextDate?: string;
+  previousNextDate: string;
   transactionId?: string;
   timestamp: number;
 }
 
 export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
-  const [undoMap, setUndoMap] = useState<Map<string, UndoAction>>(new Map());
+  // Recurring: stack-based undo (no time limit, undo back to first txn)
+  const [recurringUndoStack, setRecurringUndoStack] = useState<Map<string, UndoAction[]>>(new Map());
+  // Debts: single undo with time limit
+  const [debtUndoMap, setDebtUndoMap] = useState<Map<string, UndoAction>>(new Map());
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -184,9 +188,8 @@ export default function HomeScreen() {
       if (!rule.isActive) continue;
       const isOverdue = rule.nextDate <= today;
       const category = categories.find((c) => c.id === rule.categoryId);
-      const undoKey = `recurring-${rule.id}`;
-      const undo = undoMap.get(undoKey);
-      const canRevert = undo !== undefined && (now - undo.timestamp) < UNDO_EXPIRY_MS;
+      const stack = recurringUndoStack.get(rule.id);
+      const canRevert = stack !== undefined && stack.length > 0;
 
       items.push({
         id: rule.id,
@@ -196,6 +199,7 @@ export default function HomeScreen() {
         amount: rule.amount,
         icon: (category?.icon || 'repeat') as IconName,
         iconColor: category?.color || '#A8E6CF',
+        dueDate: rule.nextDate,
         dueLabel: isOverdue ? 'Due' : rule.nextDate,
         isOverdue,
         direction: rule.type === 'expense' ? 'payable' : 'receivable',
@@ -207,8 +211,7 @@ export default function HomeScreen() {
     for (const debt of debts) {
       if (debt.isSettled) continue;
       const isOverdue = debt.dueDate ? debt.dueDate <= today : false;
-      const undoKey = `debt-${debt.id}`;
-      const undo = undoMap.get(undoKey);
+      const undo = debtUndoMap.get(debt.id);
       const canRevert = undo !== undefined && (now - undo.timestamp) < UNDO_EXPIRY_MS;
 
       items.push({
@@ -219,6 +222,7 @@ export default function HomeScreen() {
         amount: debt.amount,
         icon: debt.direction === 'receivable' ? 'arrow-down' : 'arrow-up',
         iconColor: debt.direction === 'receivable' ? '#05DF72' : '#FF6B6B',
+        dueDate: debt.dueDate ?? null,
         dueLabel: debt.dueDate
           ? (isOverdue ? 'Overdue' : debt.dueDate)
           : 'No due date',
@@ -228,13 +232,15 @@ export default function HomeScreen() {
       });
     }
 
-    // Sort: overdue first, then by date
+    // Sort: overdue first, then chronologically by due date (earliest first)
     return items.sort((a, b) => {
       if (a.isOverdue && !b.isOverdue) return -1;
       if (!a.isOverdue && b.isOverdue) return 1;
-      return 0;
+      const dateA = a.dueDate ?? '9999-12-31';
+      const dateB = b.dueDate ?? '9999-12-31';
+      return dateA.localeCompare(dateB);
     });
-  }, [recurringRules, debts, categories, undoMap]);
+  }, [recurringRules, debts, categories, recurringUndoStack, debtUndoMap]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -298,15 +304,16 @@ export default function HomeScreen() {
         await recurringService.edit(rule.id, { nextDate });
       }
 
-      // Track undo
-      setUndoMap((prev) => {
+      // Push to recurring undo stack (no time limit)
+      setRecurringUndoStack((prev) => {
         const next = new Map(prev);
-        next.set(`recurring-${id}`, {
+        const stack = next.get(id) ?? [];
+        next.set(id, [...stack, {
           action: 'confirm',
           previousNextDate,
           transactionId: transaction.id,
           timestamp: Date.now(),
-        });
+        }]);
         return next;
       });
 
@@ -331,11 +338,12 @@ export default function HomeScreen() {
       const debtRepo = createDebtRepository();
       await debtRepo.settle(id);
 
-      // Track undo
-      setUndoMap((prev) => {
+      // Track debt undo (with time limit)
+      setDebtUndoMap((prev) => {
         const next = new Map(prev);
-        next.set(`debt-${id}`, {
+        next.set(id, {
           action: 'confirm',
+          previousNextDate: '',
           transactionId: transaction.id,
           timestamp: Date.now(),
         });
@@ -347,11 +355,13 @@ export default function HomeScreen() {
   }, [recurringRules, debts, loadData]);
 
   const handleReminderRevert = useCallback(async (id: string, type: ReminderType) => {
-    const undoKey = `${type}-${id}`;
-    const undo = undoMap.get(undoKey);
-    if (!undo) return;
+    if (type === 'recurring') {
+      const stack = recurringUndoStack.get(id);
+      if (!stack || stack.length === 0) return;
 
-    if (type === 'recurring' && undo.previousNextDate) {
+      // Pop the most recent action
+      const undo = stack[stack.length - 1];
+
       const recurringService = createRecurringService();
       await recurringService.edit(id, { nextDate: undo.previousNextDate });
 
@@ -360,7 +370,23 @@ export default function HomeScreen() {
         const transactionService = createTransactionService();
         await transactionService.remove(undo.transactionId);
       }
+
+      // Pop from stack
+      setRecurringUndoStack((prev) => {
+        const next = new Map(prev);
+        const currentStack = [...(next.get(id) ?? [])];
+        currentStack.pop();
+        if (currentStack.length === 0) {
+          next.delete(id);
+        } else {
+          next.set(id, currentStack);
+        }
+        return next;
+      });
     } else if (type === 'debt') {
+      const undo = debtUndoMap.get(id);
+      if (!undo) return;
+
       // Un-settle the debt
       const debtRepo = createDebtRepository();
       await debtRepo.unsettle(id);
@@ -370,17 +396,17 @@ export default function HomeScreen() {
         const transactionService = createTransactionService();
         await transactionService.remove(undo.transactionId);
       }
+
+      // Remove from debt undo map
+      setDebtUndoMap((prev) => {
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
     }
 
-    // Remove from undo map
-    setUndoMap((prev) => {
-      const next = new Map(prev);
-      next.delete(undoKey);
-      return next;
-    });
-
     await loadData();
-  }, [undoMap, loadData]);
+  }, [recurringUndoStack, debtUndoMap, loadData]);
 
   const handleReminderSkip = useCallback(async (id: string, type: ReminderType) => {
     if (type === 'recurring') {
@@ -392,20 +418,27 @@ export default function HomeScreen() {
       const recurringService = createRecurringService();
       await recurringService.skipNext(id);
 
-      // Track undo
-      setUndoMap((prev) => {
+      // Push skip to undo stack
+      setRecurringUndoStack((prev) => {
         const next = new Map(prev);
-        next.set(`recurring-${id}`, {
+        const stack = next.get(id) ?? [];
+        next.set(id, [...stack, {
           action: 'skip',
           previousNextDate,
           timestamp: Date.now(),
-        });
+        }]);
         return next;
       });
 
       await loadData();
     }
   }, [recurringRules, loadData]);
+
+  const handleReminderPress = useCallback((id: string, type: ReminderType) => {
+    if (type === 'recurring') {
+      router.push({ pathname: '/recurring', params: { editId: id } });
+    }
+  }, [router]);
 
   return (
     <ScrollView
@@ -465,6 +498,7 @@ export default function HomeScreen() {
             onConfirm={handleReminderConfirm}
             onRevert={handleReminderRevert}
             onSkip={handleReminderSkip}
+            onPress={handleReminderPress}
           />
         </View>
       )}
@@ -492,7 +526,7 @@ export default function HomeScreen() {
                     {cat?.name}
                   </Text>
                   <Text className="text-text-primary dark:text-text-primary-dark text-sm font-semibold">
-                    ${(cat?.amount || 0).toLocaleString()}
+                    {formatCurrency(cat?.amount || 0)}
                   </Text>
                   <Text className="text-text-muted dark:text-text-muted-dark text-xs ml-2 w-10 text-right">
                     {(cat?.percentage || 0).toFixed(0)}%
@@ -533,7 +567,7 @@ export default function HomeScreen() {
               <View>
                 <Text className="text-text-muted dark:text-text-muted-dark text-xs">Monthly Budget</Text>
                 <Text className="text-text-primary dark:text-text-primary-dark text-2xl font-bold tracking-tight">
-                  ${monthlyBudget.budget.amount.toLocaleString()}
+                  {formatCurrency(monthlyBudget.budget.amount)}
                 </Text>
               </View>
               <View className={`px-3 py-1.5 rounded-full ${
@@ -563,7 +597,7 @@ export default function HomeScreen() {
               <View>
                 <Text className="text-text-muted dark:text-text-muted-dark text-xs">Spent</Text>
                 <Text className="text-text-primary dark:text-text-primary-dark text-base font-semibold">
-                  ${monthlyBudget.spent.toLocaleString()}
+                  {formatCurrency(monthlyBudget.spent)}
                 </Text>
               </View>
               <View className="items-end">
@@ -571,7 +605,7 @@ export default function HomeScreen() {
                   {monthlyBudget.remaining > 0 ? 'Remaining' : 'Over Budget'}
                 </Text>
                 <Text className={`text-base font-semibold ${monthlyBudget.spent > monthlyBudget.budget.amount ? 'text-expense' : 'text-secondary'}`}>
-                  ${Math.abs(monthlyBudget.budget.amount - monthlyBudget.spent).toLocaleString()}
+                  {formatCurrency(Math.abs(monthlyBudget.budget.amount - monthlyBudget.spent))}
                 </Text>
               </View>
             </View>

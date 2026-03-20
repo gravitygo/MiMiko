@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { formatCurrency } from '@/state/settings.store';
 import { BentoCard } from './bento-card';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -51,25 +52,15 @@ function MiniSparkline({ data }: { data: number[] }) {
 export function BalanceCard({ totalBalance, income, expense, committed, sparklineData = [], accounts = [] }: BalanceCardProps) {
   const [showBreakdown, setShowBreakdown] = useState(false);
 
-  const formattedBalance = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(totalBalance);
+  const formattedBalance = formatCurrency(totalBalance);
 
   const available = totalBalance - committed;
-  const formattedAvailable = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(available);
+  const formattedAvailable = formatCurrency(available);
 
   const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   return (
-    <BentoCard size="2x2" className="justify-between">
+    <BentoCard size="auto" className="justify-between">
       <View>
         <Pressable onPress={() => setShowBreakdown((prev) => !prev)} className="active:opacity-80">
           <View className="flex-row items-center justify-between">
@@ -95,7 +86,7 @@ export function BalanceCard({ totalBalance, income, expense, committed, sparklin
               {formattedAvailable} available
             </Text>
             <Text className="text-tertiary text-xs ml-1">
-              (${committed.toLocaleString()} committed)
+              ({formatCurrency(committed)} committed)
             </Text>
           </View>
         )}
@@ -119,7 +110,7 @@ export function BalanceCard({ totalBalance, income, expense, committed, sparklin
                     acc.balance >= 0 ? 'text-secondary' : 'text-expense'
                   }`}
                 >
-                  ${Math.abs(acc.balance).toLocaleString()}
+                  {formatCurrency(acc.balance)}
                 </Text>
               </View>
             ))}
@@ -141,7 +132,7 @@ export function BalanceCard({ totalBalance, income, expense, committed, sparklin
             <View>
               <Text className="text-text-muted dark:text-text-muted-dark text-xs">Income</Text>
               <Text className="text-secondary font-semibold">
-                +${income.toLocaleString()}
+                +{formatCurrency(income)}
               </Text>
             </View>
           </View>
@@ -153,7 +144,7 @@ export function BalanceCard({ totalBalance, income, expense, committed, sparklin
             <View>
               <Text className="text-text-muted dark:text-text-muted-dark text-xs">Expense</Text>
               <Text className="text-expense font-semibold">
-                -${expense.toLocaleString()}
+                -{formatCurrency(expense)}
               </Text>
             </View>
           </View>

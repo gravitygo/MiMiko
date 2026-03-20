@@ -33,3 +33,14 @@ export const useSettingsStore = create<SettingsState & SettingsActions>((set) =>
 export function getCurrencySymbol(code: CurrencyCode): string {
   return CURRENCIES.find((c) => c.code === code)?.symbol ?? '$';
 }
+
+export function formatCurrency(amount: number, code?: CurrencyCode): string {
+  const currency = code ?? useSettingsStore.getState().currency;
+  const symbol = getCurrencySymbol(currency);
+  return `${symbol}${Math.abs(amount).toLocaleString()}`;
+}
+
+export function formatSignedCurrency(amount: number, type: 'expense' | 'income', code?: CurrencyCode): string {
+  const prefix = type === 'expense' ? '-' : '+';
+  return `${prefix}${formatCurrency(amount, code)}`;
+}

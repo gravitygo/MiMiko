@@ -1,5 +1,7 @@
-import { View, Text, Pressable } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { Pressable, Text, View } from 'react-native';
+
+import { formatSignedCurrency } from '@/state/settings.store';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -25,7 +27,7 @@ export function RecentTransactionItem({
   onPress,
 }: RecentTransactionItemProps) {
   const isExpense = type === 'expense';
-  const formattedAmount = `${isExpense ? '-' : '+'}$${amount.toLocaleString()}`;
+  const formattedAmount = formatSignedCurrency(amount, type);
 
   return (
     <Pressable

@@ -15,8 +15,12 @@ Local LLM for parsing voice transcripts → structured transaction JSON.
 - `createAIService()`: factory for LLM-powered parsing
   - `init(onProgress?)`: load TinyLlama GGUF model
   - `isReady()`: check if llama context loaded
-  - `parseTranscript(text)`: transcript → ParsedTransaction (llama if available, else fallback regex)
+  - `parseTranscript(text, categories?)`: transcript → ParsedTransaction (llama if available, else fallback regex)
   - `release()`: free llama context
+- `buildSystemPrompt()`: creates rich prompt with keyword hints per category (CATEGORY_HINTS map)
+  - Separates expense vs income categories with context keywords
+  - Includes 7 few-shot examples covering various scenarios
+  - Better date handling (today, yesterday, last week)
 
 ---
 
