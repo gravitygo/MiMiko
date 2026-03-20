@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -74,7 +75,7 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
             <AddButton
               key={route.key}
               onPress={onPress}
-              onLongPress={onLongPress}
+              onLongPress={() => router.push('/voice')}
               primaryColor={colors.primary}
             />
           );

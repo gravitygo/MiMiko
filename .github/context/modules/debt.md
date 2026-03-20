@@ -20,6 +20,7 @@ Replaces old payable module. Tracks who owes who (payables/receivables).
 - `delete()`: remove debt
 - `findUnsettled()`: all unsettled, ordered by due_date
 - `settle()`: mark is_settled = 1
+- `unsettle()`: mark is_settled = 0 (for undo/revert)
 - `sumUnsettledPayables()`: total amount you owe (for ghost allocated)
 
 ## debt.service.ts

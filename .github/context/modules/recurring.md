@@ -9,6 +9,7 @@
 ## recurring.model.ts
 - createRecurringRule(): builds new entity
 - calculateNextDate(): computes next occurrence
+- calculatePreviousDate(): computes previous occurrence (for undo/revert)
 
 ## recurring.repository.ts
 - insert() / update() / delete()

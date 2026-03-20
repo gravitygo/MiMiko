@@ -18,12 +18,15 @@ Location: `components/dashboard/`
 - displays income/expense summary with current month label
 - shows ghost allocated "committed" amount + available balance
 - includes mini sparkline graph
+- **Account Breakdown**: tap total balance to expand/collapse per-account balances
+- accepts `accounts` prop for breakdown data
 
 ### reminders-list.tsx
 - `RemindersList`: vertical list of swipeable reminder cards
-- `ReminderCard`: swipe right = confirm (paid/received), swipe left = skip
+- `ReminderCard`: swipe RIGHT = confirm (paid/received), swipe LEFT = undo/revert, long press = skip
+- `canRevert` prop: yellow dot indicator when item has a reversible action
 - shows recurring due items + unsettled debts
-- uses react-native-gesture-handler Swipeable
+- uses react-native-gesture-handler Swipeable + expo-haptics
 
 ### quick-add-card.tsx
 - `QuickAddCard`: medium 2x1 shortcut (removed from dashboard)

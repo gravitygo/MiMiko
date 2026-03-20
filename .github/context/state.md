@@ -82,6 +82,21 @@ Zustand stores for global UI state + hooks for service integration.
 
 ---
 
+### state/voice.store.ts
+
+- `useVoiceStore`
+- `logs`: VoiceLog array
+- `isListening`: recording state
+- `currentTranscript`: live transcript text
+- `setLogs()`: replace all
+- `addLog()`: prepend one
+- `removeLog()`: delete by id
+- `clearLogs()`: wipe all
+- `setListening()`: toggle recording state
+- `setCurrentTranscript()`: update live text
+
+---
+
 ## Hooks (Service Integration)
 
 ### hooks/use-transactions.ts

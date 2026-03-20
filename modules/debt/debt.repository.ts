@@ -75,6 +75,14 @@ export function createDebtRepository() {
       );
     },
 
+    async unsettle(id: string): Promise<void> {
+      const db = await getDatabase();
+      await db.runAsync(
+        'UPDATE debts SET is_settled = 0, updated_at = ? WHERE id = ?',
+        [new Date().toISOString(), id]
+      );
+    },
+
     async sumUnsettledPayables(): Promise<number> {
       const db = await getDatabase();
       const result = await db.getFirstAsync<{ total: number }>(

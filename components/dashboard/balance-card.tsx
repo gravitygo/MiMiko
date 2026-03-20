@@ -1,7 +1,19 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 
 import { BentoCard } from './bento-card';
+
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+interface AccountBreakdown {
+  id: string;
+  name: string;
+  balance: number;
+  icon: string;
+  color: string;
+  type: string;
+}
 
 interface BalanceCardProps {
   totalBalance: number;
@@ -9,6 +21,7 @@ interface BalanceCardProps {
   expense: number;
   committed: number;
   sparklineData?: number[];
+  accounts?: AccountBreakdown[];
 }
 
 function MiniSparkline({ data }: { data: number[] }) {
@@ -35,7 +48,9 @@ function MiniSparkline({ data }: { data: number[] }) {
   );
 }
 
-export function BalanceCard({ totalBalance, income, expense, committed, sparklineData = [] }: BalanceCardProps) {
+export function BalanceCard({ totalBalance, income, expense, committed, sparklineData = [], accounts = [] }: BalanceCardProps) {
+  const [showBreakdown, setShowBreakdown] = useState(false);
+
   const formattedBalance = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -56,12 +71,23 @@ export function BalanceCard({ totalBalance, income, expense, committed, sparklin
   return (
     <BentoCard size="2x2" className="justify-between">
       <View>
-        <Text className="text-text-muted dark:text-text-muted-dark text-sm font-medium tracking-tight">
-          Total Balance
-        </Text>
-        <Text className="text-text-primary dark:text-text-primary-dark text-4xl font-bold tracking-tight mt-1">
-          {formattedBalance}
-        </Text>
+        <Pressable onPress={() => setShowBreakdown((prev) => !prev)} className="active:opacity-80">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-text-muted dark:text-text-muted-dark text-sm font-medium tracking-tight">
+              Total Balance
+            </Text>
+            {accounts.length > 1 && (
+              <Ionicons
+                name={showBreakdown ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color="#71717A"
+              />
+            )}
+          </View>
+          <Text className="text-text-primary dark:text-text-primary-dark text-4xl font-bold tracking-tight mt-1">
+            {formattedBalance}
+          </Text>
+        </Pressable>
         {committed > 0 && (
           <View className="flex-row items-center mt-1">
             <Ionicons name="lock-closed" size={12} color="#FFBA00" />
@@ -71,6 +97,32 @@ export function BalanceCard({ totalBalance, income, expense, committed, sparklin
             <Text className="text-tertiary text-xs ml-1">
               (${committed.toLocaleString()} committed)
             </Text>
+          </View>
+        )}
+
+        {/* Account Breakdown */}
+        {showBreakdown && accounts.length > 0 && (
+          <View className="mt-3 pt-3 border-t border-border/30 dark:border-white/10">
+            {accounts.map((acc) => (
+              <View key={acc.id} className="flex-row items-center py-1.5">
+                <View
+                  className="w-7 h-7 rounded-full items-center justify-center mr-2.5"
+                  style={{ backgroundColor: acc.color + '20' }}
+                >
+                  <Ionicons name={acc.icon as IconName} size={14} color={acc.color} />
+                </View>
+                <Text className="text-text-primary dark:text-text-primary-dark text-sm flex-1" numberOfLines={1}>
+                  {acc.name}
+                </Text>
+                <Text
+                  className={`text-sm font-semibold ${
+                    acc.balance >= 0 ? 'text-secondary' : 'text-expense'
+                  }`}
+                >
+                  ${Math.abs(acc.balance).toLocaleString()}
+                </Text>
+              </View>
+            ))}
           </View>
         )}
       </View>

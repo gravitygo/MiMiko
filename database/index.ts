@@ -69,6 +69,18 @@ export async function initializeDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_debts_due_date ON debts(due_date);
   `);
 
+  // Migration: create voice_logs table
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS voice_logs (
+      id TEXT PRIMARY KEY NOT NULL,
+      transcript TEXT NOT NULL,
+      language TEXT NOT NULL,
+      duration_ms INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_voice_logs_created_at ON voice_logs(created_at);
+  `);
+
   await seedDefaultData(database);
 }
 
@@ -80,6 +92,7 @@ export async function resetAllData(): Promise<void> {
     DELETE FROM budgets;
     DELETE FROM payables;
     DELETE FROM debts;
+    DELETE FROM voice_logs;
     DELETE FROM accounts WHERE is_default = 0;
     DELETE FROM categories WHERE is_default = 0;
     UPDATE accounts SET balance = 0;

@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as Haptics from 'expo-haptics';
 import { useRef } from 'react';
-import { Animated, Text, View } from 'react-native';
+import { Animated, Pressable, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -18,18 +19,23 @@ export interface ReminderItem {
   dueLabel: string;
   isOverdue: boolean;
   direction?: 'payable' | 'receivable';
+  canRevert?: boolean;
 }
 
 interface ReminderCardProps {
   item: ReminderItem;
   onConfirm: (id: string, type: ReminderType) => void;
-  onDismiss: (id: string, type: ReminderType) => void;
+  onRevert: (id: string, type: ReminderType) => void;
+  onSkip: (id: string, type: ReminderType) => void;
 }
 
 function renderRightAction(
   _progress: Animated.AnimatedInterpolation<number>,
-  dragX: Animated.AnimatedInterpolation<number>
+  dragX: Animated.AnimatedInterpolation<number>,
+  canRevert: boolean
 ) {
+  if (!canRevert) return null;
+
   const scale = dragX.interpolate({
     inputRange: [-80, 0],
     outputRange: [1, 0.5],
@@ -40,10 +46,10 @@ function renderRightAction(
     <View className="flex-row items-center">
       <Animated.View
         style={{ transform: [{ scale }] }}
-        className="bg-text-muted/20 rounded-2xl px-5 py-3 items-center justify-center ml-2 h-full"
+        className="bg-tertiary/20 rounded-2xl px-5 py-3 items-center justify-center ml-2 h-full"
       >
-        <Ionicons name="close" size={20} color="#71717A" />
-        <Text className="text-text-muted text-xs mt-1">Skip</Text>
+        <Ionicons name="arrow-undo" size={20} color="#FFBA00" />
+        <Text className="text-tertiary text-xs mt-1 font-medium">Undo</Text>
       </Animated.View>
     </View>
   );
@@ -64,7 +70,7 @@ function renderLeftAction(
   const label = isDebt
     ? direction === 'receivable' ? 'Received' : 'Paid'
     : 'Paid';
-  const color = isDebt && direction === 'receivable' ? '#05DF72' : '#05DF72';
+  const color = '#05DF72';
 
   return (
     <View className="flex-row items-center">
@@ -79,17 +85,28 @@ function renderLeftAction(
   );
 }
 
-export function ReminderCard({ item, onConfirm, onDismiss }: ReminderCardProps) {
+export function ReminderCard({ item, onConfirm, onRevert, onSkip }: ReminderCardProps) {
   const swipeableRef = useRef<Swipeable>(null);
 
   const handleSwipeLeft = () => {
-    onDismiss(item.id, item.type);
+    if (item.canRevert) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      onRevert(item.id, item.type);
+    }
     swipeableRef.current?.close();
   };
 
   const handleSwipeRight = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onConfirm(item.id, item.type);
     swipeableRef.current?.close();
+  };
+
+  const handleLongPress = () => {
+    if (item.type === 'recurring') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      onSkip(item.id, item.type);
+    }
   };
 
   const amountColor = item.direction === 'receivable' ? '#05DF72' : '#FF6B6B';
@@ -98,7 +115,11 @@ export function ReminderCard({ item, onConfirm, onDismiss }: ReminderCardProps) 
   return (
     <Swipeable
       ref={swipeableRef}
-      renderRightActions={renderRightAction}
+      renderRightActions={
+        item.canRevert
+          ? (progress, dragX) => renderRightAction(progress, dragX, true)
+          : undefined
+      }
       renderLeftActions={(progress, dragX) =>
         renderLeftAction(progress, dragX, item.type === 'debt', item.direction)
       }
@@ -110,34 +131,41 @@ export function ReminderCard({ item, onConfirm, onDismiss }: ReminderCardProps) 
       overshootLeft={false}
       overshootRight={false}
     >
-      <View className="flex-row items-center bg-surface dark:bg-surface-dark rounded-2xl px-4 py-3">
-        <View
-          className="w-10 h-10 rounded-full items-center justify-center mr-3"
-          style={{ backgroundColor: item.iconColor + '20' }}
-        >
-          <Ionicons name={item.icon} size={20} color={item.iconColor} />
-        </View>
-
-        <View className="flex-1">
-          <Text className="text-text-primary dark:text-text-primary-dark font-medium text-sm" numberOfLines={1}>
-            {item.title}
-          </Text>
-          <Text className="text-text-muted dark:text-text-muted-dark text-xs" numberOfLines={1}>
-            {item.subtitle}
-          </Text>
-        </View>
-
-        <View className="items-end ml-2">
-          <Text style={{ color: amountColor }} className="font-semibold text-sm">
-            {amountPrefix}${item.amount.toLocaleString()}
-          </Text>
-          <Text
-            className={`text-xs ${item.isOverdue ? 'text-expense' : 'text-text-muted dark:text-text-muted-dark'}`}
+      <Pressable onLongPress={handleLongPress} delayLongPress={800}>
+        <View className="flex-row items-center bg-surface dark:bg-surface-dark rounded-2xl px-4 py-3">
+          <View
+            className="w-10 h-10 rounded-full items-center justify-center mr-3"
+            style={{ backgroundColor: item.iconColor + '20' }}
           >
-            {item.dueLabel}
-          </Text>
+            <Ionicons name={item.icon} size={20} color={item.iconColor} />
+          </View>
+
+          <View className="flex-1">
+            <View className="flex-row items-center">
+              <Text className="text-text-primary dark:text-text-primary-dark font-medium text-sm" numberOfLines={1}>
+                {item.title}
+              </Text>
+              {item.canRevert && (
+                <View className="ml-2 w-2 h-2 rounded-full bg-tertiary" />
+              )}
+            </View>
+            <Text className="text-text-muted dark:text-text-muted-dark text-xs" numberOfLines={1}>
+              {item.subtitle}
+            </Text>
+          </View>
+
+          <View className="items-end ml-2">
+            <Text style={{ color: amountColor }} className="font-semibold text-sm">
+              {amountPrefix}${item.amount.toLocaleString()}
+            </Text>
+            <Text
+              className={`text-xs ${item.isOverdue ? 'text-expense' : 'text-text-muted dark:text-text-muted-dark'}`}
+            >
+              {item.dueLabel}
+            </Text>
+          </View>
         </View>
-      </View>
+      </Pressable>
     </Swipeable>
   );
 }
@@ -145,10 +173,11 @@ export function ReminderCard({ item, onConfirm, onDismiss }: ReminderCardProps) 
 interface RemindersListProps {
   items: ReminderItem[];
   onConfirm: (id: string, type: ReminderType) => void;
-  onDismiss: (id: string, type: ReminderType) => void;
+  onRevert: (id: string, type: ReminderType) => void;
+  onSkip: (id: string, type: ReminderType) => void;
 }
 
-export function RemindersList({ items, onConfirm, onDismiss }: RemindersListProps) {
+export function RemindersList({ items, onConfirm, onRevert, onSkip }: RemindersListProps) {
   if (items.length === 0) return null;
 
   return (
@@ -158,7 +187,8 @@ export function RemindersList({ items, onConfirm, onDismiss }: RemindersListProp
           key={`${item.type}-${item.id}`}
           item={item}
           onConfirm={onConfirm}
-          onDismiss={onDismiss}
+          onRevert={onRevert}
+          onSkip={onSkip}
         />
       ))}
     </View>

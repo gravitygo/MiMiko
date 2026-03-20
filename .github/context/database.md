@@ -11,6 +11,9 @@ SQLite via expo-sqlite.
 - accounts
 - budgets
 - recurring_rules
+- payables
+- debts
+- voice_logs
 
 ---
 
@@ -38,6 +41,7 @@ SQLite via expo-sqlite.
 ## database/index.ts
 
 - getDatabase(): singleton connection
-- initializeDatabase(): creates tables + seeds
-- closeDatabase(): cleanup
+- initializeDatabase(): creates tables + seeds + migrations (payables, debts, voice_logs)
+- resetAllData(): wipes transactions, recurring, budgets, payables, debts, voice_logs
+- seedDefaultData(): inserts default categories + accounts
 

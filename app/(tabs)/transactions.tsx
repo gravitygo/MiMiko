@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Modal, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Modal, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DatePickerField } from '@/components/ui/date-picker-field';
@@ -11,7 +11,7 @@ import { useAccounts } from '@/hooks/use-accounts';
 import { useCategories } from '@/hooks/use-categories';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTransactions } from '@/hooks/use-transactions';
-import type { Transaction } from '@/modules/transaction/transaction.types';
+import type { Transaction, TransactionFilter } from '@/modules/transaction/transaction.types';
 import { useAccountStore } from '@/state/account.store';
 import { useCategoryStore } from '@/state/category.store';
 import { useTransactionStore } from '@/state/transaction.store';
@@ -113,6 +113,37 @@ function groupByDate(transactions: Transaction[]): DateGroup[] {
 
 type ListItem = { type: 'header'; title: string; id: string } | { type: 'item'; data: Transaction };
 
+type DatePreset = 'all' | 'today' | 'week' | 'month' | 'custom';
+
+const DATE_PRESETS: { value: DatePreset; label: string }[] = [
+  { value: 'all', label: 'All Time' },
+  { value: 'today', label: 'Today' },
+  { value: 'week', label: 'This Week' },
+  { value: 'month', label: 'This Month' },
+  { value: 'custom', label: 'Custom' },
+];
+
+function getDateRange(preset: DatePreset): { startDate?: string; endDate?: string } {
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+
+  switch (preset) {
+    case 'today':
+      return { startDate: today, endDate: today + 'T23:59:59' };
+    case 'week': {
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay());
+      return { startDate: weekStart.toISOString().split('T')[0] };
+    }
+    case 'month': {
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { startDate: monthStart.toISOString().split('T')[0] };
+    }
+    default:
+      return {};
+  }
+}
+
 export default function TransactionsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -120,6 +151,14 @@ export default function TransactionsScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+
+  // Filter state
+  const [filterType, setFilterType] = useState<'all' | 'expense' | 'income'>('all');
+  const [filterCategoryId, setFilterCategoryId] = useState<string | null>(null);
+  const [filterDatePreset, setFilterDatePreset] = useState<DatePreset>('all');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  const [showFilterModal, setShowFilterModal] = useState(false);
 
   const transactions = useTransactionStore((s) => s.transactions);
   const categories = useCategoryStore((s) => s.categories);
@@ -154,13 +193,30 @@ export default function TransactionsScreen() {
     return items;
   }, [transactions]);
 
+  const activeFilter = useMemo<TransactionFilter>(() => {
+    const filter: TransactionFilter = { limit: 50 };
+    if (filterType !== 'all') filter.type = filterType;
+    if (filterCategoryId) filter.categoryId = filterCategoryId;
+
+    if (filterDatePreset === 'custom') {
+      if (filterStartDate) filter.startDate = filterStartDate;
+      if (filterEndDate) filter.endDate = filterEndDate + 'T23:59:59';
+    } else {
+      const range = getDateRange(filterDatePreset);
+      if (range.startDate) filter.startDate = range.startDate;
+      if (range.endDate) filter.endDate = range.endDate;
+    }
+
+    return filter;
+  }, [filterType, filterCategoryId, filterDatePreset, filterStartDate, filterEndDate]);
+
   const loadData = useCallback(async () => {
     await Promise.all([
-      fetchTransactions({ limit: 50 }),
+      fetchTransactions(activeFilter),
       fetchCategories(),
       fetchAccounts(),
     ]);
-  }, [fetchTransactions, fetchCategories, fetchAccounts]);
+  }, [fetchTransactions, fetchCategories, fetchAccounts, activeFilter]);
 
   useFocusEffect(
     useCallback(() => {
@@ -201,8 +257,8 @@ export default function TransactionsScreen() {
     });
     setEditSubmitting(false);
     setShowEditModal(false);
-    await fetchTransactions({ limit: 50 });
-  }, [editingTx, editAmount, editDescription, editDate, editCategoryId, editAccountId, editTransaction, fetchTransactions]);
+    await fetchTransactions(activeFilter);
+  }, [editingTx, editAmount, editDescription, editDate, editCategoryId, editAccountId, editTransaction, fetchTransactions, activeFilter]);
 
   const handleEditDelete = useCallback(async () => {
     if (!editingTx) return;
@@ -255,6 +311,21 @@ export default function TransactionsScreen() {
     return item.type === 'header' ? item.id : item.data.id;
   }, []);
 
+  const hasActiveFilters = filterType !== 'all' || filterCategoryId !== null || filterDatePreset !== 'all';
+
+  const clearFilters = useCallback(() => {
+    setFilterType('all');
+    setFilterCategoryId(null);
+    setFilterDatePreset('all');
+    setFilterStartDate('');
+    setFilterEndDate('');
+  }, []);
+
+  const selectedCategoryName = useMemo(() => {
+    if (!filterCategoryId) return null;
+    return categories.find((c) => c.id === filterCategoryId)?.name ?? null;
+  }, [filterCategoryId, categories]);
+
   if (initialLoading) {
     return (
       <View className="flex-1 bg-background dark:bg-background-dark items-center justify-center">
@@ -287,6 +358,74 @@ export default function TransactionsScreen() {
 
   return (
     <View className="flex-1 bg-background dark:bg-background-dark">
+      {/* Filter Bar */}
+      <View style={{ paddingTop: insets.top + 8 }} className="px-4 pb-2 bg-background dark:bg-background-dark">
+        {/* Type Filter Pills */}
+        <View className="flex-row gap-2 mb-2">
+          {(['all', 'expense', 'income'] as const).map((type) => (
+            <Pressable
+              key={type}
+              onPress={() => setFilterType(type)}
+              className={`px-4 py-2 rounded-full ${
+                filterType === type ? 'bg-primary' : 'bg-surface dark:bg-surface-dark'
+              }`}
+            >
+              <Text className={`text-sm font-medium capitalize ${
+                filterType === type ? 'text-white' : 'text-text-primary dark:text-text-primary-dark'
+              }`}>
+                {type === 'all' ? 'All' : type}
+              </Text>
+            </Pressable>
+          ))}
+
+          {/* More Filters Button */}
+          <Pressable
+            onPress={() => setShowFilterModal(true)}
+            className={`px-4 py-2 rounded-full flex-row items-center ${
+              (filterCategoryId || filterDatePreset !== 'all') ? 'bg-primary' : 'bg-surface dark:bg-surface-dark'
+            }`}
+          >
+            <Ionicons
+              name="filter"
+              size={14}
+              color={(filterCategoryId || filterDatePreset !== 'all') ? '#FFFFFF' : colors.textSecondary}
+            />
+            <Text className={`text-sm font-medium ml-1 ${
+              (filterCategoryId || filterDatePreset !== 'all') ? 'text-white' : 'text-text-primary dark:text-text-primary-dark'
+            }`}>
+              Filters
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Active filter tags */}
+        {hasActiveFilters && (
+          <View className="flex-row items-center gap-2">
+            {selectedCategoryName && (
+              <View className="flex-row items-center bg-primary/15 rounded-full px-3 py-1">
+                <Text className="text-primary text-xs font-medium">{selectedCategoryName}</Text>
+                <Pressable onPress={() => setFilterCategoryId(null)} className="ml-1">
+                  <Ionicons name="close-circle" size={14} color={colors.tint} />
+                </Pressable>
+              </View>
+            )}
+            {filterDatePreset !== 'all' && (
+              <View className="flex-row items-center bg-primary/15 rounded-full px-3 py-1">
+                <Text className="text-primary text-xs font-medium">
+                  {filterDatePreset === 'custom' ? `${filterStartDate || '...'} → ${filterEndDate || '...'}` : DATE_PRESETS.find((p) => p.value === filterDatePreset)?.label}
+                </Text>
+                <Pressable onPress={() => { setFilterDatePreset('all'); setFilterStartDate(''); setFilterEndDate(''); }} className="ml-1">
+                  <Ionicons name="close-circle" size={14} color={colors.tint} />
+                </Pressable>
+              </View>
+            )}
+            <Pressable onPress={clearFilters}>
+              <Text className="text-text-muted dark:text-text-muted-dark text-xs">Clear all</Text>
+            </Pressable>
+          </View>
+        )}
+      </View>
+
       <FlatList
         data={listData}
         renderItem={renderItem}
@@ -294,9 +433,94 @@ export default function TransactionsScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.tint} />
         }
-        contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       />
+
+      {/* Filter Modal */}
+      <Modal visible={showFilterModal} animationType="slide" transparent onRequestClose={() => setShowFilterModal(false)}>
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-surface dark:bg-surface-dark rounded-t-3xl p-6">
+            <View className="flex-row items-center justify-between mb-5">
+              <Text className="text-text-primary dark:text-text-primary-dark text-xl font-bold">Filters</Text>
+              <Pressable onPress={() => setShowFilterModal(false)} className="w-8 h-8 rounded-full bg-surface-hover dark:bg-surface-hover-dark items-center justify-center">
+                <Ionicons name="close" size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            {/* Category Filter */}
+            <Text className="text-text-muted dark:text-text-muted-dark text-sm font-medium mb-2">Category</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
+              <View className="flex-row gap-2">
+                <Pressable
+                  onPress={() => setFilterCategoryId(null)}
+                  className={`px-4 py-2 rounded-full ${!filterCategoryId ? 'bg-primary' : 'bg-surface-hover dark:bg-surface-hover-dark'}`}
+                >
+                  <Text className={`text-sm ${!filterCategoryId ? 'text-white font-medium' : 'text-text-primary dark:text-text-primary-dark'}`}>All</Text>
+                </Pressable>
+                {categories.map((cat) => (
+                  <Pressable
+                    key={cat.id}
+                    onPress={() => setFilterCategoryId(cat.id)}
+                    className={`flex-row items-center px-3 py-2 rounded-full ${filterCategoryId === cat.id ? 'bg-primary' : 'bg-surface-hover dark:bg-surface-hover-dark'}`}
+                  >
+                    <Ionicons name={cat.icon as any} size={14} color={filterCategoryId === cat.id ? '#FFFFFF' : cat.color} />
+                    <Text className={`text-sm ml-1.5 ${filterCategoryId === cat.id ? 'text-white font-medium' : 'text-text-primary dark:text-text-primary-dark'}`}>
+                      {cat.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </ScrollView>
+
+            {/* Date Filter */}
+            <Text className="text-text-muted dark:text-text-muted-dark text-sm font-medium mb-2">Date Range</Text>
+            <View className="flex-row flex-wrap gap-2 mb-4">
+              {DATE_PRESETS.map((preset) => (
+                <Pressable
+                  key={preset.value}
+                  onPress={() => setFilterDatePreset(preset.value)}
+                  className={`px-4 py-2 rounded-full ${filterDatePreset === preset.value ? 'bg-primary' : 'bg-surface-hover dark:bg-surface-hover-dark'}`}
+                >
+                  <Text className={`text-sm ${filterDatePreset === preset.value ? 'text-white font-medium' : 'text-text-primary dark:text-text-primary-dark'}`}>
+                    {preset.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Custom Date Range */}
+            {filterDatePreset === 'custom' && (
+              <View className="flex-row gap-3 mb-4">
+                <View className="flex-1">
+                  <DatePickerField label="From" value={filterStartDate} onChange={setFilterStartDate} />
+                </View>
+                <View className="flex-1">
+                  <DatePickerField label="To" value={filterEndDate} onChange={setFilterEndDate} />
+                </View>
+              </View>
+            )}
+
+            {/* Apply */}
+            <View className="flex-row gap-3 mt-2">
+              <Pressable
+                onPress={() => { clearFilters(); setShowFilterModal(false); }}
+                className="flex-1 py-4 rounded-2xl items-center bg-surface-hover dark:bg-surface-hover-dark"
+              >
+                <Text className="text-text-primary dark:text-text-primary-dark font-semibold">Reset</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setShowFilterModal(false)}
+                className="flex-1 py-4 rounded-2xl items-center bg-primary"
+              >
+                <Text className="text-white font-semibold">Apply</Text>
+              </Pressable>
+            </View>
+
+            <View style={{ height: insets.bottom + 16 }} />
+          </View>
+        </View>
+      </Modal>
 
       {/* Edit/Delete Modal */}
       <Modal visible={showEditModal} animationType="slide" transparent onRequestClose={() => setShowEditModal(false)}>

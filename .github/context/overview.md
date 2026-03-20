@@ -44,9 +44,22 @@ UI → Hooks → Service → Repository → Database
 - `components/dashboard/reminders-list.tsx` - Swipeable reminder cards (recurring + debts)
 - `components/dashboard/` - Dashboard components (balance card with ghost allocated)
 
+### ✅ Completed (Voice)
+- Voice module (types, model, mapper, repo, service)
+- `state/voice.store.ts` - Voice log state
+- `hooks/use-voice.ts` - Voice log CRUD
+- `app/voice.tsx` - Voice recording modal (expo-speech-recognition, on-device)
+- Voice log viewer in settings
+- Database: voice_logs table
+
+### ✅ New Features
+- Reminders revert: swipe LEFT = undo, long press = skip, swipe RIGHT = paid
+- Balance card: expandable account breakdown (tap to toggle)
+- Transaction filters: type pills, category picker, date presets + custom range
+- Voice mode: long press add button → voice recording modal
+
 ### ❌ Not Started
-- Voice module
-- AI module
+- AI module (voice → transaction parsing)
 
 ---
 

@@ -7,9 +7,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { ReminderItem, ReminderType } from '@/components/dashboard';
 import {
-  BalanceCard,
-  RecentTransactionItem,
-  RemindersList,
+    BalanceCard,
+    RecentTransactionItem,
+    RemindersList,
 } from '@/components/dashboard';
 import { useAccounts } from '@/hooks/use-accounts';
 import { useBudgets } from '@/hooks/use-budgets';
@@ -17,7 +17,7 @@ import { useCategories } from '@/hooks/use-categories';
 import { useDebts } from '@/hooks/use-debts';
 import { useRecurring } from '@/hooks/use-recurring';
 import { useTransactions } from '@/hooks/use-transactions';
-import { createDebtService } from '@/modules/debt/debt.service';
+import { createDebtRepository } from '@/modules/debt/debt.repository';
 import { calculateNextDate } from '@/modules/recurring/recurring.model';
 import { createRecurringService } from '@/modules/recurring/recurring.service';
 import { createTransactionService } from '@/modules/transaction/transaction.service';
@@ -30,10 +30,19 @@ import { useTransactionStore } from '@/state/transaction.store';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-const BOTTOM_NAV_HEIGHT = 100;
+const BOTTOM_NAV_HEIGHT = 130;
+const UNDO_EXPIRY_MS = 30_000;
+
+interface UndoAction {
+  action: 'confirm' | 'skip';
+  previousNextDate?: string;
+  transactionId?: string;
+  timestamp: number;
+}
 
 export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
+  const [undoMap, setUndoMap] = useState<Map<string, UndoAction>>(new Map());
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -159,6 +168,7 @@ export default function HomeScreen() {
   // Build reminder items from recurring rules + unsettled debts
   const reminderItems = useMemo<ReminderItem[]>(() => {
     const today = new Date().toISOString().split('T')[0];
+    const now = Date.now();
     const items: ReminderItem[] = [];
 
     // Recurring reminders
@@ -166,6 +176,9 @@ export default function HomeScreen() {
       if (!rule.isActive) continue;
       const isOverdue = rule.nextDate <= today;
       const category = categories.find((c) => c.id === rule.categoryId);
+      const undoKey = `recurring-${rule.id}`;
+      const undo = undoMap.get(undoKey);
+      const canRevert = undo !== undefined && (now - undo.timestamp) < UNDO_EXPIRY_MS;
 
       items.push({
         id: rule.id,
@@ -178,6 +191,7 @@ export default function HomeScreen() {
         dueLabel: isOverdue ? 'Due' : rule.nextDate,
         isOverdue,
         direction: rule.type === 'expense' ? 'payable' : 'receivable',
+        canRevert,
       });
     }
 
@@ -185,6 +199,9 @@ export default function HomeScreen() {
     for (const debt of debts) {
       if (debt.isSettled) continue;
       const isOverdue = debt.dueDate ? debt.dueDate <= today : false;
+      const undoKey = `debt-${debt.id}`;
+      const undo = undoMap.get(undoKey);
+      const canRevert = undo !== undefined && (now - undo.timestamp) < UNDO_EXPIRY_MS;
 
       items.push({
         id: debt.id,
@@ -199,6 +216,7 @@ export default function HomeScreen() {
           : 'No due date',
         isOverdue,
         direction: debt.direction,
+        canRevert,
       });
     }
 
@@ -208,7 +226,7 @@ export default function HomeScreen() {
       if (!a.isOverdue && b.isOverdue) return 1;
       return 0;
     });
-  }, [recurringRules, debts, categories]);
+  }, [recurringRules, debts, categories, undoMap]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -248,9 +266,11 @@ export default function HomeScreen() {
       const rule = recurringRules.find((r) => r.id === id);
       if (!rule) return;
 
+      const previousNextDate = rule.nextDate;
+
       // Create the transaction
       const transactionService = createTransactionService();
-      await transactionService.add({
+      const transaction = await transactionService.add({
         type: rule.type,
         amount: rule.amount,
         description: rule.description ?? rule.name,
@@ -264,32 +284,119 @@ export default function HomeScreen() {
       const recurringService = createRecurringService();
       const nextDate = calculateNextDate(rule.nextDate, rule.frequency);
 
-      // Check if end date exceeded
       if (rule.endDate && nextDate > rule.endDate) {
         await recurringService.pause(rule.id);
       } else {
         await recurringService.edit(rule.id, { nextDate });
       }
 
+      // Track undo
+      setUndoMap((prev) => {
+        const next = new Map(prev);
+        next.set(`recurring-${id}`, {
+          action: 'confirm',
+          previousNextDate,
+          transactionId: transaction.id,
+          timestamp: Date.now(),
+        });
+        return next;
+      });
+
       await loadData();
     } else if (type === 'debt') {
-      const debtService = createDebtService();
-      await debtService.settle(id);
+      const debt = debts.find((d) => d.id === id);
+      if (!debt) return;
+
+      // Create settlement transaction manually so we can track its ID
+      const txType = debt.direction === 'payable' ? 'expense' : 'income';
+      const transactionService = createTransactionService();
+      const transaction = await transactionService.add({
+        type: txType,
+        amount: debt.amount,
+        description: `${debt.direction === 'payable' ? 'Paid' : 'Received from'} ${debt.personName}${debt.description ? ': ' + debt.description : ''}`,
+        categoryId: debt.categoryId ?? 'cat_transfers',
+        accountId: debt.accountId ?? 'acc_cash',
+        date: new Date().toISOString(),
+      });
+
+      // Mark debt as settled
+      const debtRepo = createDebtRepository();
+      await debtRepo.settle(id);
+
+      // Track undo
+      setUndoMap((prev) => {
+        const next = new Map(prev);
+        next.set(`debt-${id}`, {
+          action: 'confirm',
+          transactionId: transaction.id,
+          timestamp: Date.now(),
+        });
+        return next;
+      });
+
       await loadData();
     }
-  }, [recurringRules, loadData]);
+  }, [recurringRules, debts, loadData]);
 
-  const handleReminderDismiss = useCallback(async (id: string, type: ReminderType) => {
+  const handleReminderRevert = useCallback(async (id: string, type: ReminderType) => {
+    const undoKey = `${type}-${id}`;
+    const undo = undoMap.get(undoKey);
+    if (!undo) return;
+
+    if (type === 'recurring' && undo.previousNextDate) {
+      const recurringService = createRecurringService();
+      await recurringService.edit(id, { nextDate: undo.previousNextDate });
+
+      // Delete the auto-created transaction if it was a confirm
+      if (undo.action === 'confirm' && undo.transactionId) {
+        const transactionService = createTransactionService();
+        await transactionService.remove(undo.transactionId);
+      }
+    } else if (type === 'debt') {
+      // Un-settle the debt
+      const debtRepo = createDebtRepository();
+      await debtRepo.unsettle(id);
+
+      // Delete the auto-created transaction
+      if (undo.transactionId) {
+        const transactionService = createTransactionService();
+        await transactionService.remove(undo.transactionId);
+      }
+    }
+
+    // Remove from undo map
+    setUndoMap((prev) => {
+      const next = new Map(prev);
+      next.delete(undoKey);
+      return next;
+    });
+
+    await loadData();
+  }, [undoMap, loadData]);
+
+  const handleReminderSkip = useCallback(async (id: string, type: ReminderType) => {
     if (type === 'recurring') {
-      // Skip: advance nextDate without creating transaction
       const rule = recurringRules.find((r) => r.id === id);
       if (!rule) return;
 
+      const previousNextDate = rule.nextDate;
+
       const recurringService = createRecurringService();
       await recurringService.skipNext(id);
+
+      // Track undo
+      setUndoMap((prev) => {
+        const next = new Map(prev);
+        next.set(`recurring-${id}`, {
+          action: 'skip',
+          previousNextDate,
+          timestamp: Date.now(),
+        });
+        return next;
+      });
+
       await loadData();
     }
-    // For debts, swiping left does nothing (they can delete from add screen or we just ignore)
   }, [recurringRules, loadData]);
 
   return (
@@ -324,6 +431,14 @@ export default function HomeScreen() {
         expense={monthlyExpense}
         committed={committed}
         sparklineData={sparklineData}
+        accounts={accounts.map((a) => ({
+          id: a.id,
+          name: a.name,
+          balance: a.balance,
+          icon: a.icon,
+          color: a.color,
+          type: a.type,
+        }))}
       />
 
       {/* Reminders Section */}
@@ -334,13 +449,14 @@ export default function HomeScreen() {
               Reminders
             </Text>
             <Text className="text-text-muted dark:text-text-muted-dark text-xs">
-              Swipe → Paid · ← Skip
+              → Paid · ← Undo · Hold Skip
             </Text>
           </View>
           <RemindersList
             items={reminderItems}
             onConfirm={handleReminderConfirm}
-            onDismiss={handleReminderDismiss}
+            onRevert={handleReminderRevert}
+            onSkip={handleReminderSkip}
           />
         </View>
       )}
