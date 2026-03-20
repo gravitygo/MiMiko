@@ -44,11 +44,14 @@ UI → Hooks → Service → Repository → Database
 - `components/dashboard/reminders-list.tsx` - Swipeable reminder cards (recurring + debts)
 - `components/dashboard/` - Dashboard components (balance card with ghost allocated)
 
-### ✅ Completed (Voice)
-- Voice module (types, model, mapper, repo, service)
+### ✅ Completed (Voice + AI)
+- Voice module (types, model, mapper, repo, service, whisper.service)
+- AI module (ai.types, ai.validator, ai.service) — LLM transaction parsing
 - `state/voice.store.ts` - Voice log state
 - `hooks/use-voice.ts` - Voice log CRUD
-- `app/voice.tsx` - Voice recording modal (expo-speech-recognition, on-device)
+- `app/voice.tsx` - Voice mode (whisper.rn STT + llama.rn AI parsing)
+- `services/model-manager.ts` - Download + manage whisper/llama GGUF models
+- `types/native-ai.d.ts` - Type declarations for whisper.rn and llama.rn
 - Voice log viewer in settings
 - Database: voice_logs table
 

@@ -11,8 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to use speech recognition.",
-        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone."
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone for voice recognition."
       },
       "bundleIdentifier": "com.gravitygo.MiKiko"
     },
@@ -49,8 +48,7 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      "expo-sqlite",
-      "expo-speech-recognition"
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,

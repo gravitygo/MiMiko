@@ -1,6 +1,6 @@
 # Voice Module
 
-On-device speech recognition → transcript logging.
+On-device speech recognition (Whisper) → transcript logging + AI transaction parsing (LLM).
 
 ---
 
@@ -29,14 +29,34 @@ On-device speech recognition → transcript logging.
 - `clearAll()`: wipe all logs
 - `count()`: total count
 
+## whisper.service.ts
+- `createWhisperService()`: factory for on-device STT
+  - `init()`: load whisper GGML model from disk
+  - `isReady()`: check if context is loaded
+  - `startRealtime(lang, onTranscript, onError)`: mic → real-time transcription
+  - `stop()`: stop recording
+  - `release()`: free whisper context
+
 ---
 
 ## Speech Recognition
-- Package: `expo-speech-recognition` (requires dev build)
-- On-device: `requiresOnDeviceRecognition: true`
-- Languages: en-US, fil-PH (English, Filipino/Tagalog)
-- Continuous mode for longer dictation
-- Graceful fallback when module not installed
+- Package: `whisper.rn` (on-device Whisper model)
+- Model: `ggml-tiny.bin` (~77MB, downloaded on first use)
+- Languages: en, auto (whisper auto-detect)
+- Uses `WhisperContext.transcribeRealtime()` for live mic → text
+- Model stored at: `${documentDirectory}/models/ggml-tiny.bin`
+
+## AI Pipeline
+- Flow: Audio → Whisper STT → transcript → LLama parser → validated JSON → Transaction
+- See: [AI Module](ai.md) for LLM parsing details
+
+## UI Flow (app/voice.tsx)
+- States: loading → setup → ready → recording → transcribed → parsing → parsed
+- Setup screen: download whisper + optional llama models with progress
+- Recording: whisper real-time transcription with pulse animation
+- After recording: "Parse Transaction" (AI) or "Save Log" buttons
+- Parsed: shows amount, category, description, date for confirmation
+- Long press + button (floating tab bar) → voice modal
 
 ## UI Flow
 - Long press + button (floating tab bar) → `app/voice.tsx` modal
