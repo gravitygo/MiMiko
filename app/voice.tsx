@@ -232,10 +232,11 @@ export default function VoiceScreen() {
   const handleParseTransaction = useCallback(async () => {
     if (!transcript.trim()) return;
     setScreenState('parsing');
-    const result = await aiServiceRef.current.parseTranscript(transcript.trim());
+    const categoryInfo = categories.map((c) => ({ name: c.name, type: c.type }));
+    const result = await aiServiceRef.current.parseTranscript(transcript.trim(), categoryInfo);
     setParsedTx(result);
     setScreenState('parsed');
-  }, [transcript]);
+  }, [transcript, categories]);
 
   const matchedCategory = useMemo(() => {
     if (!parsedTx) return null;

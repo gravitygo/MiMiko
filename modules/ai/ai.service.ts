@@ -6,28 +6,63 @@ import { fallbackParse, validateParsedTransaction } from './ai.validator';
 
 let llamaContext: LlamaContext | null = null;
 
-const SYSTEM_PROMPT = `You are a financial transaction parser. Given a spoken description of an expense or income, extract the data and output ONLY valid JSON. No explanation. No markdown.
+interface CategoryInfo {
+  name: string;
+  type: 'expense' | 'income';
+}
+
+function buildSystemPrompt(categories: CategoryInfo[], today: string): string {
+  let categoryList: string;
+  if (categories.length > 0) {
+    const expenses = categories.filter(c => c.type === 'expense').map(c => c.name);
+    const incomes = categories.filter(c => c.type === 'income').map(c => c.name);
+    const parts: string[] = [];
+    if (expenses.length > 0) parts.push(`Expense: ${expenses.join(', ')}`);
+    if (incomes.length > 0) parts.push(`Income: ${incomes.join(', ')}`);
+    categoryList = parts.join('\n');
+  } else {
+    categoryList = 'Expense: Food, Transport, Shopping, Bills, Entertainment, Health, Education, Other\nIncome: Salary, Freelance, Other';
+  }
+
+  const todayDate = new Date(today);
+  const lastWeek = new Date(todayDate);
+  lastWeek.setDate(lastWeek.getDate() - 7);
+  const lastWeekStr = `${lastWeek.getFullYear()}-${String(lastWeek.getMonth() + 1).padStart(2, '0')}-${String(lastWeek.getDate()).padStart(2, '0')}`;
+
+  return `You are a financial transaction parser. Given a spoken description of an expense or income, extract the data and output ONLY valid JSON. No explanation. No markdown.
+Today's date is ${today}.
 
 Output format:
 {"amount":number,"category":"string","description":"string","date":"YYYY-MM-DD"}
 
-Categories: Food, Transport, Shopping, Bills, Entertainment, Health, Education, Salary, Freelance, Other
-If category is unclear, use "Other".
-If no date mentioned, use today.
-If no description, set description to the full input text.
+${categoryList}
+
+Rules:
+- You MUST pick one of the above categories exactly as written.
+- If the context is about spending or paying, pick from Expense categories.
+- If the context is about earning or receiving money, pick from Income categories.
+- If none match well, pick the closest one.
+- Compute relative dates: "today" = ${today}, "yesterday" = subtract 1 day, "last week" = subtract 7 days, etc.
+- If no date mentioned, use today (${today}).
+- If no description, set description to the full input text.
 
 Examples:
 Input: "Spent fifty dollars on groceries today"
-Output: {"amount":50,"category":"Food","description":"groceries","date":"TODAY"}
+Output: {"amount":50,"category":"Food","description":"groceries","date":"${today}"}
 
 Input: "Paid 200 for electricity bill"
-Output: {"amount":200,"category":"Bills","description":"electricity bill","date":"TODAY"}
+Output: {"amount":200,"category":"Bills","description":"electricity bill","date":"${today}"}
 
 Input: "Got 1500 salary"
-Output: {"amount":1500,"category":"Salary","description":"salary","date":"TODAY"}`;
+Output: {"amount":1500,"category":"Salary","description":"salary","date":"${today}"}
 
-function buildPrompt(transcript: string, today: string): string {
-  return `<|system|>\n${SYSTEM_PROMPT.replace(/TODAY/g, today)}\n<|user|>\n${transcript}\n<|assistant|>\n`;
+Input: "Uber ride last week for 2000 bucks"
+Output: {"amount":2000,"category":"Transport","description":"Uber ride","date":"${lastWeekStr}"}`;
+}
+
+function buildPrompt(transcript: string, today: string, categories: CategoryInfo[]): string {
+  const systemPrompt = buildSystemPrompt(categories, today);
+  return `<|system|>\n${systemPrompt}\n<|user|>\n${transcript}\n<|assistant|>\n`;
 }
 
 export function createAIService() {
@@ -55,16 +90,17 @@ export function createAIService() {
       return llamaContext !== null;
     },
 
-    async parseTranscript(transcript: string): Promise<ParsedTransaction | null> {
+    async parseTranscript(transcript: string, categories?: CategoryInfo[]): Promise<ParsedTransaction | null> {
       const today = new Date();
       const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const cats = categories ?? [];
 
       if (!llamaContext) {
         return fallbackParse(transcript);
       }
 
       try {
-        const prompt = buildPrompt(transcript, todayStr);
+        const prompt = buildPrompt(transcript, todayStr, cats);
         const result = await llamaContext.completion({
           prompt,
           n_predict: 256,
