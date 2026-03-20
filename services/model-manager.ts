@@ -1,6 +1,6 @@
-import * as FileSystem from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 
-const MODELS_DIR = `${FileSystem.documentDirectory}models/`;
+const modelsDir = new Directory(Paths.document, 'models');
 
 const MODEL_FILES = {
   whisper: 'ggml-tiny.bin',
@@ -21,21 +21,23 @@ const MODEL_SIZES = {
 
 type ModelType = keyof typeof MODEL_FILES;
 
-async function ensureModelsDir(): Promise<void> {
-  const info = await FileSystem.getInfoAsync(MODELS_DIR);
-  if (!info.exists) {
-    await FileSystem.makeDirectoryAsync(MODELS_DIR, { intermediates: true });
+function ensureModelsDir(): void {
+  if (!modelsDir.exists) {
+    modelsDir.create();
   }
 }
 
-export function getModelPath(type: ModelType): string {
-  return `${MODELS_DIR}${MODEL_FILES[type]}`;
+function getModelFile(type: ModelType): File {
+  return new File(modelsDir, MODEL_FILES[type]);
 }
 
-export async function isModelDownloaded(type: ModelType): Promise<boolean> {
-  const path = getModelPath(type);
-  const info = await FileSystem.getInfoAsync(path);
-  return info.exists && info.size > 0;
+export function getModelPath(type: ModelType): string {
+  return getModelFile(type).uri;
+}
+
+export function isModelDownloaded(type: ModelType): boolean {
+  const file = getModelFile(type);
+  return file.exists && file.size > 0;
 }
 
 export function getModelSize(type: ModelType): number {
@@ -46,54 +48,67 @@ export async function downloadModel(
   type: ModelType,
   onProgress?: (progress: number) => void,
 ): Promise<string> {
-  await ensureModelsDir();
-  const filePath = getModelPath(type);
+  ensureModelsDir();
   const url = MODEL_URLS[type];
+  const expectedSize = MODEL_SIZES[type];
 
-  const downloadResumable = FileSystem.createDownloadResumable(
-    url,
-    filePath,
-    {},
-    (downloadProgress) => {
-      if (onProgress && downloadProgress.totalBytesExpectedToWrite > 0) {
-        const progress =
-          downloadProgress.totalBytesWritten /
-          downloadProgress.totalBytesExpectedToWrite;
-        onProgress(Math.round(progress * 100));
-      }
-    },
-  );
-
-  const result = await downloadResumable.downloadAsync();
-  if (!result?.uri) {
-    throw new Error(`Failed to download ${type} model`);
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to download ${type} model: HTTP ${response.status}`);
+  }
+  if (!response.body) {
+    throw new Error(`No response body for ${type} model download`);
   }
 
-  return result.uri;
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.byteLength;
+    if (onProgress) {
+      const total =
+        Number(response.headers.get('content-length')) || expectedSize;
+      onProgress(Math.round((received / total) * 100));
+    }
+  }
+
+  const merged = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  const file = getModelFile(type);
+  file.create({ intermediates: true });
+  file.write(merged);
+
+  return file.uri;
 }
 
-export async function deleteModel(type: ModelType): Promise<void> {
-  const path = getModelPath(type);
-  const info = await FileSystem.getInfoAsync(path);
-  if (info.exists) {
-    await FileSystem.deleteAsync(path);
+export function deleteModel(type: ModelType): void {
+  const file = getModelFile(type);
+  if (file.exists) {
+    file.delete();
   }
 }
 
-export async function getModelStatus(): Promise<
-  Record<ModelType, { downloaded: boolean; path: string; sizeMB: number }>
+export function getModelStatus(): Record<
+  ModelType,
+  { downloaded: boolean; path: string; sizeMB: number }
 > {
-  const whisperDownloaded = await isModelDownloaded('whisper');
-  const llamaDownloaded = await isModelDownloaded('llama');
-
   return {
     whisper: {
-      downloaded: whisperDownloaded,
+      downloaded: isModelDownloaded('whisper'),
       path: getModelPath('whisper'),
       sizeMB: Math.round(MODEL_SIZES.whisper / 1_000_000),
     },
     llama: {
-      downloaded: llamaDownloaded,
+      downloaded: isModelDownloaded('llama'),
       path: getModelPath('llama'),
       sizeMB: Math.round(MODEL_SIZES.llama / 1_000_000),
     },
