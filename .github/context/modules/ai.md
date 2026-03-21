@@ -15,13 +15,28 @@ Local LLM for parsing voice transcripts → structured transaction JSON.
 - `createAIService()`: factory for LLM-powered parsing
   - `init(onProgress?)`: load TinyLlama GGUF model
   - `isReady()`: check if llama context loaded
-  - `parseTranscript(text, categories?)`: transcript → ParsedTransaction (llama if available, else fallback regex)
+  - `parseTranscript(text, categories?)`: transcript → ParsedTransaction
   - `release()`: free llama context
-- `buildSystemPrompt(categories, today)`: creates minimal prompt optimized for TinyLlama
-  - Simple category list (Expense/Income separated)
-  - today/yesterday date handling
-  - 3 concise few-shot examples
-  - No hints or verbose rules (keeps token count low)
+
+### Helpers (internal)
+- `getDateContext()`: returns { today, yesterday } as YYYY-MM-DD
+- `buildPrompt(transcript, categories, today, yesterday)`: compact prompt for small LLMs
+- `extractJSON(text)`: robust JSON extraction with malformation handling
+- `matchCategory(text, availableCategories)`: weighted keyword-based category matching
+- `resolveCategory(llmCategory, transcript, description, categoryNames)`: post-process LLM output
+- `enhancedFallback(transcript, categories, today)`: deterministic fallback with keyword matching
+
+### Category Matching System
+- `CATEGORY_KEYWORDS`: mapping of categories → weighted keyword arrays
+- Keywords ordered by specificity (earlier = higher score)
+- Scoring: matches summed with positional weight
+- Supports: Food, Transport, Shopping, Bills, Entertainment, Health, Education, Salary, Freelance
+
+### Generation Parameters (deterministic)
+- `temperature: 0` - no randomness
+- `top_k: 1, top_p: 1` - greedy decoding
+- `n_predict: 96` - minimal token output
+- `stop: ["\n", "</s>", "<|user|>", "<|end|>", "<|"]`
 
 ---
 
@@ -32,23 +47,21 @@ Local LLM for parsing voice transcripts → structured transaction JSON.
   - `confidence: 'fallback'` - no match, uses first expense category
   - `aiRaw`: original AI-parsed category string
 - UI shows confidence badges (Fallback/Partial) when not exact match
-- Shows AI's raw parsed category when mismatch occurs
 
 ---
 
 ## Model
 - Package: `llama.rn` (on-device GGUF inference)
 - Model: `tinyllama-1.1b-chat.Q4_K_M.gguf` (~636MB, optional download)
-- Context: 512 tokens, 4 threads, CPU-only (safe for all devices)
-- Prompt: minimal system prompt (optimized for small model performance)
+- Context: 512 tokens, 4 threads, CPU-only
 - Output: strict JSON `{amount, category, description, date}`
-- Fallback: regex amount extraction when no model available
+- Fallback: regex + keyword matching when no model available
 
-## Prompt Design (Optimized for TinyLlama)
-- Minimal instructions to reduce token overhead
-- Simple category list without keyword hints
-- 3 examples covering expense, income, and date handling
-- Rules: use exact category name, today/yesterday dates
+## Prompt Design
+- Compact system prompt optimized for small LLMs
+- Explicit category list with keyword hints (food→Food, uber→Transport, etc.)
+- Critical instruction: "Pick BEST category, Other ONLY if nothing matches"
+- today/yesterday date context injected
 
 ## Validation Rules
 - amount must be > 0
@@ -62,8 +75,8 @@ Local LLM for parsing voice transcripts → structured transaction JSON.
 - `downloadModel(type, onProgress)`: downloads from HuggingFace with progress
 - `deleteModel(type)`: remove cached model
 - `getModelStatus()`: summary of all models
-- `isSetupComplete()`: checks if first-open setup has been completed (file flag)
-- `markSetupComplete()`: marks setup as done (writes flag file)
+- `isSetupComplete()`: checks if first-open setup has been completed
+- `markSetupComplete()`: marks setup as done
 
 ## App Boot Flow (app/_layout.tsx)
 - Phase 1: DB init + check setup flag

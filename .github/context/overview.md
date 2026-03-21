@@ -30,6 +30,7 @@ UI → Hooks → Service → Repository → Database
 - All Zustand stores (+ settings, debt stores)
 - Database schema + seeds + migrations (end_date, payables, debts tables)
 - resetAllData() for full data wipe
+- Backup/restore service (JSON export/import via share sheet)
 
 ### ✅ Completed (Frontend)
 - `app/(tabs)/_layout.tsx` - Tab navigator (5 tabs: home, transactions, add, budgets, settings; payables hidden)
