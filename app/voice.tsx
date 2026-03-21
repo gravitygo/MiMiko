@@ -238,23 +238,27 @@ export default function VoiceScreen() {
     setScreenState('parsed');
   }, [transcript, categories]);
 
-  const matchedCategory = useMemo(() => {
-    if (!parsedTx) return null;
-    const lower = parsedTx.category.toLowerCase();
+  const categoryMatch = useMemo(() => {
+    if (!parsedTx) return { category: null, confidence: 'none' as const, aiRaw: '' };
+    const aiRaw = parsedTx.category;
+    const lower = aiRaw.toLowerCase().trim();
 
-    // Exact match
+    // Exact match (case-insensitive)
     const exact = categories.find((c) => c.name.toLowerCase() === lower);
-    if (exact) return exact;
+    if (exact) return { category: exact, confidence: 'exact' as const, aiRaw };
 
-    // Partial/fuzzy match: category name contains parsed or parsed contains category name
+    // Partial match: category name contains parsed or parsed contains category name
     const partial = categories.find(
       (c) => c.name.toLowerCase().includes(lower) || lower.includes(c.name.toLowerCase()),
     );
-    if (partial) return partial;
+    if (partial) return { category: partial, confidence: 'partial' as const, aiRaw };
 
     // Fallback to first expense category
-    return categories.find((c) => c.type === 'expense') ?? null;
+    const fallback = categories.find((c) => c.type === 'expense') ?? null;
+    return { category: fallback, confidence: 'fallback' as const, aiRaw };
   }, [parsedTx, categories]);
+
+  const matchedCategory = categoryMatch.category;
 
   const defaultAccount = useMemo(
     () => accounts.find((a) => a.isDefault) ?? accounts[0] ?? null,
@@ -454,10 +458,30 @@ export default function VoiceScreen() {
             </View>
             <View className="flex-row items-center justify-between mb-2">
               <Text style={{ color: colors.textSecondary }} className="text-sm">Category</Text>
-              <Text style={{ color: colors.text }} className="text-base font-medium">
-                {matchedCategory?.name ?? parsedTx.category}
-              </Text>
+              <View className="flex-row items-center gap-2">
+                <Text style={{ color: colors.text }} className="text-base font-medium">
+                  {matchedCategory?.name ?? parsedTx.category}
+                </Text>
+                {categoryMatch.confidence === 'fallback' && (
+                  <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: '#FF6B6B20' }}>
+                    <Text style={{ color: '#FF6B6B' }} className="text-xs font-medium">Fallback</Text>
+                  </View>
+                )}
+                {categoryMatch.confidence === 'partial' && (
+                  <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: '#FFA50020' }}>
+                    <Text style={{ color: '#FFA500' }} className="text-xs font-medium">Partial</Text>
+                  </View>
+                )}
+              </View>
             </View>
+            {categoryMatch.confidence !== 'exact' && categoryMatch.aiRaw && (
+              <View className="flex-row items-center justify-between mb-2">
+                <Text style={{ color: colors.textMuted }} className="text-xs">AI parsed</Text>
+                <Text style={{ color: colors.textMuted }} className="text-xs italic">
+                  "{categoryMatch.aiRaw}"
+                </Text>
+              </View>
+            )}
             {parsedTx.description && (
               <View className="flex-row items-center justify-between mb-2">
                 <Text style={{ color: colors.textSecondary }} className="text-sm">Description</Text>

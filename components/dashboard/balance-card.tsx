@@ -75,7 +75,7 @@ export function BalanceCard({ totalBalance, income, expense, committed, sparklin
               />
             )}
           </View>
-          <Text className="text-text-primary dark:text-text-primary-dark text-4xl font-bold tracking-tight mt-1">
+          <Text className={`text-4xl font-bold tracking-tight mt-1 ${totalBalance < 0 ? 'text-expense' : 'text-text-primary dark:text-text-primary-dark'}`}>
             {formattedBalance}
           </Text>
         </Pressable>

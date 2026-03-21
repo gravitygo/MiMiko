@@ -43,7 +43,11 @@ export function getCurrencySymbol(code: CurrencyCode): string {
 export function formatCurrency(amount: number, code?: CurrencyCode): string {
   const currency = code ?? useSettingsStore.getState().currency;
   const symbol = getCurrencySymbol(currency);
-  return `${symbol}${Math.abs(amount).toLocaleString()}`;
+  const formatted = Math.abs(amount).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return amount < 0 ? `-${symbol}${formatted}` : `${symbol}${formatted}`;
 }
 
 export function formatSignedCurrency(

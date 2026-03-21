@@ -17,10 +17,22 @@ Local LLM for parsing voice transcripts → structured transaction JSON.
   - `isReady()`: check if llama context loaded
   - `parseTranscript(text, categories?)`: transcript → ParsedTransaction (llama if available, else fallback regex)
   - `release()`: free llama context
-- `buildSystemPrompt()`: creates rich prompt with keyword hints per category (CATEGORY_HINTS map)
-  - Separates expense vs income categories with context keywords
-  - Includes 7 few-shot examples covering various scenarios
-  - Better date handling (today, yesterday, last week)
+- `buildSystemPrompt(categories, today)`: creates minimal prompt optimized for TinyLlama
+  - Simple category list (Expense/Income separated)
+  - today/yesterday date handling
+  - 3 concise few-shot examples
+  - No hints or verbose rules (keeps token count low)
+
+---
+
+## Category Matching (app/voice.tsx)
+- `categoryMatch`: matches AI output category name to user's categories
+  - `confidence: 'exact'` - exact case-insensitive match
+  - `confidence: 'partial'` - partial string match
+  - `confidence: 'fallback'` - no match, uses first expense category
+  - `aiRaw`: original AI-parsed category string
+- UI shows confidence badges (Fallback/Partial) when not exact match
+- Shows AI's raw parsed category when mismatch occurs
 
 ---
 
@@ -28,9 +40,15 @@ Local LLM for parsing voice transcripts → structured transaction JSON.
 - Package: `llama.rn` (on-device GGUF inference)
 - Model: `tinyllama-1.1b-chat.Q4_K_M.gguf` (~636MB, optional download)
 - Context: 512 tokens, 4 threads, CPU-only (safe for all devices)
-- Prompt: system prompt with category list + few-shot examples
+- Prompt: minimal system prompt (optimized for small model performance)
 - Output: strict JSON `{amount, category, description, date}`
 - Fallback: regex amount extraction when no model available
+
+## Prompt Design (Optimized for TinyLlama)
+- Minimal instructions to reduce token overhead
+- Simple category list without keyword hints
+- 3 examples covering expense, income, and date handling
+- Rules: use exact category name, today/yesterday dates
 
 ## Validation Rules
 - amount must be > 0
