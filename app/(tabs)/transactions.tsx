@@ -26,6 +26,7 @@ import type {
   Transaction,
   TransactionFilter,
 } from "@/modules/transaction/transaction.types";
+import { formatSignedCurrency } from "@/modules/currency/currency.types";
 import { useAccountStore } from "@/state/account.store";
 import { useCategoryStore } from "@/state/category.store";
 import { useTransactionStore } from "@/state/transaction.store";
@@ -36,6 +37,7 @@ interface TransactionItemProps {
   categoryIcon: string;
   categoryColor: string;
   accountName: string;
+  accountCurrency: string;
   onPress: (id: string) => void;
 }
 
@@ -45,13 +47,18 @@ function TransactionItem({
   categoryIcon,
   categoryColor,
   accountName,
+  accountCurrency,
   onPress,
 }: TransactionItemProps) {
   const isExpense = transaction.type === "expense";
-  const amountColor = isExpense ? "#FF6B6B" : "#05DF72";
-  const amountPrefix = isExpense ? "-" : "+";
+  const isTransfer = transaction.type === "transfer";
+  const amountColor = isExpense ? "#FF6B6B" : isTransfer ? "#3B82F6" : "#05DF72";
 
-  const formattedAmount = `${amountPrefix}$${transaction.amount.toFixed(2)}`;
+  const formattedAmount = formatSignedCurrency(
+    transaction.amount,
+    transaction.type as "expense" | "income" | "transfer",
+    accountCurrency
+  );
   const formattedDate = new Date(transaction.date).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -363,6 +370,7 @@ export default function TransactionsScreen() {
           categoryIcon={cat?.icon ?? "wallet"}
           categoryColor={cat?.color ?? "#888888"}
           accountName={acc?.name ?? "Unknown"}
+          accountCurrency={acc?.currency ?? "php"}
           onPress={handlePress}
         />
       );

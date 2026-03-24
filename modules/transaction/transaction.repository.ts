@@ -7,8 +7,8 @@ export function createTransactionRepository() {
     async insert(transaction: Transaction): Promise<void> {
       const db = await getDatabase();
       await db.runAsync(
-        `INSERT INTO transactions (id, type, amount, description, category_id, account_id, date, recurring_rule_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO transactions (id, type, amount, description, category_id, account_id, to_account_id, to_amount, fee, exchange_rate, date, recurring_rule_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           transaction.id,
           transaction.type,
@@ -16,6 +16,10 @@ export function createTransactionRepository() {
           transaction.description,
           transaction.categoryId,
           transaction.accountId,
+          transaction.toAccountId,
+          transaction.toAmount,
+          transaction.fee,
+          transaction.exchangeRate,
           transaction.date,
           transaction.recurringRuleId,
           transaction.createdAt,
@@ -27,13 +31,17 @@ export function createTransactionRepository() {
     async update(transaction: Transaction): Promise<void> {
       const db = await getDatabase();
       await db.runAsync(
-        `UPDATE transactions SET type = ?, amount = ?, description = ?, category_id = ?, account_id = ?, date = ?, updated_at = ? WHERE id = ?`,
+        `UPDATE transactions SET type = ?, amount = ?, description = ?, category_id = ?, account_id = ?, to_account_id = ?, to_amount = ?, fee = ?, exchange_rate = ?, date = ?, updated_at = ? WHERE id = ?`,
         [
           transaction.type,
           transaction.amount,
           transaction.description,
           transaction.categoryId,
           transaction.accountId,
+          transaction.toAccountId,
+          transaction.toAmount,
+          transaction.fee,
+          transaction.exchangeRate,
           transaction.date,
           transaction.updatedAt,
           transaction.id,

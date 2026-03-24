@@ -1,4 +1,4 @@
-import { createTransaction, duplicateTransaction } from './transaction.model';
+import { createTransaction, duplicateTransaction, isTransfer } from './transaction.model';
 import { createTransactionRepository } from './transaction.repository';
 import { createAccountService } from '@/modules/account';
 import type {
@@ -28,11 +28,42 @@ export function createTransactionService() {
     }
   }
 
+  async function adjustTransferBalances(
+    fromAccountId: string,
+    toAccountId: string,
+    amount: number,
+    toAmount: number | null,
+    fee: number,
+    reverse = false
+  ): Promise<void> {
+    const totalDebit = amount + fee;
+    // For multi-currency: use toAmount if provided, otherwise use source amount
+    const creditAmount = toAmount ?? amount;
+
+    if (reverse) {
+      // Reverse: credit back to source, debit from destination
+      await accountService.credit(fromAccountId, totalDebit);
+      await accountService.debit(toAccountId, creditAmount);
+    } else {
+      // Forward: debit from source (amount + fee), credit to destination
+      await accountService.debit(fromAccountId, totalDebit);
+      await accountService.credit(toAccountId, creditAmount);
+    }
+  }
+
   return {
     async add(input: CreateTransactionInput): Promise<Transaction> {
       const transaction = createTransaction(input);
       await repository.insert(transaction);
-      await adjustAccountBalance(input.accountId, input.amount, input.type);
+
+      if (input.type === 'transfer' && input.toAccountId) {
+        const fee = input.fee ?? 0;
+        const toAmount = input.toAmount ?? null;
+        await adjustTransferBalances(input.accountId, input.toAccountId, input.amount, toAmount, fee);
+      } else if (input.type !== 'transfer') {
+        await adjustAccountBalance(input.accountId, input.amount, input.type);
+      }
+
       return transaction;
     },
 
@@ -40,7 +71,24 @@ export function createTransactionService() {
       const existing = await repository.findById(id);
       if (!existing) return null;
 
-      await adjustAccountBalance(existing.accountId, existing.amount, existing.type, true);
+      // Reverse existing balance adjustments
+      if (isTransfer(existing) && existing.toAccountId) {
+        await adjustTransferBalances(
+          existing.accountId,
+          existing.toAccountId,
+          existing.amount,
+          existing.toAmount,
+          existing.fee ?? 0,
+          true
+        );
+      } else if (!isTransfer(existing)) {
+        await adjustAccountBalance(
+          existing.accountId,
+          existing.amount,
+          existing.type as 'expense' | 'income',
+          true
+        );
+      }
 
       const updated: Transaction = {
         ...existing,
@@ -49,12 +97,32 @@ export function createTransactionService() {
         description: input.description ?? existing.description,
         categoryId: input.categoryId ?? existing.categoryId,
         accountId: input.accountId ?? existing.accountId,
+        toAccountId: input.toAccountId ?? existing.toAccountId,
+        toAmount: input.toAmount ?? existing.toAmount,
+        fee: input.fee ?? existing.fee,
+        exchangeRate: input.exchangeRate ?? existing.exchangeRate,
         date: input.date ?? existing.date,
         updatedAt: new Date().toISOString(),
       };
 
       await repository.update(updated);
-      await adjustAccountBalance(updated.accountId, updated.amount, updated.type);
+
+      // Apply new balance adjustments
+      if (isTransfer(updated) && updated.toAccountId) {
+        await adjustTransferBalances(
+          updated.accountId,
+          updated.toAccountId,
+          updated.amount,
+          updated.toAmount,
+          updated.fee ?? 0
+        );
+      } else if (!isTransfer(updated)) {
+        await adjustAccountBalance(
+          updated.accountId,
+          updated.amount,
+          updated.type as 'expense' | 'income'
+        );
+      }
 
       return updated;
     },
@@ -63,7 +131,25 @@ export function createTransactionService() {
       const existing = await repository.findById(id);
       if (!existing) return false;
 
-      await adjustAccountBalance(existing.accountId, existing.amount, existing.type, true);
+      // Reverse balance adjustments
+      if (isTransfer(existing) && existing.toAccountId) {
+        await adjustTransferBalances(
+          existing.accountId,
+          existing.toAccountId,
+          existing.amount,
+          existing.toAmount,
+          existing.fee ?? 0,
+          true
+        );
+      } else if (!isTransfer(existing)) {
+        await adjustAccountBalance(
+          existing.accountId,
+          existing.amount,
+          existing.type as 'expense' | 'income',
+          true
+        );
+      }
+
       await repository.delete(id);
       return true;
     },
@@ -74,7 +160,22 @@ export function createTransactionService() {
 
       const duplicated = duplicateTransaction(existing);
       await repository.insert(duplicated);
-      await adjustAccountBalance(duplicated.accountId, duplicated.amount, duplicated.type);
+
+      if (isTransfer(duplicated) && duplicated.toAccountId) {
+        await adjustTransferBalances(
+          duplicated.accountId,
+          duplicated.toAccountId,
+          duplicated.amount,
+          duplicated.toAmount,
+          duplicated.fee ?? 0
+        );
+      } else if (!isTransfer(duplicated)) {
+        await adjustAccountBalance(
+          duplicated.accountId,
+          duplicated.amount,
+          duplicated.type as 'expense' | 'income'
+        );
+      }
 
       return duplicated;
     },

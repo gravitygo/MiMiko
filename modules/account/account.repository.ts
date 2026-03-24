@@ -7,16 +7,19 @@ export function createAccountRepository() {
     async insert(account: Account): Promise<void> {
       const db = await getDatabase();
       await db.runAsync(
-        `INSERT INTO accounts (id, name, type, balance, icon, color, is_default, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO accounts (id, name, type, balance, currency, icon, color, is_default, billing_date, deadline_date, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           account.id,
           account.name,
           account.type,
           account.balance,
+          account.currency,
           account.icon,
           account.color,
           account.isDefault ? 1 : 0,
+          account.billingDate ?? null,
+          account.deadlineDate ?? null,
           account.createdAt,
           account.updatedAt,
         ]
@@ -26,8 +29,19 @@ export function createAccountRepository() {
     async update(account: Account): Promise<void> {
       const db = await getDatabase();
       await db.runAsync(
-        `UPDATE accounts SET name = ?, type = ?, balance = ?, icon = ?, color = ?, updated_at = ? WHERE id = ?`,
-        [account.name, account.type, account.balance, account.icon, account.color, account.updatedAt, account.id]
+        `UPDATE accounts SET name = ?, type = ?, balance = ?, currency = ?, icon = ?, color = ?, billing_date = ?, deadline_date = ?, updated_at = ? WHERE id = ?`,
+        [
+          account.name,
+          account.type,
+          account.balance,
+          account.currency,
+          account.icon,
+          account.color,
+          account.billingDate ?? null,
+          account.deadlineDate ?? null,
+          account.updatedAt,
+          account.id,
+        ]
       );
     },
 

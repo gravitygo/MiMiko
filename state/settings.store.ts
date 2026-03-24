@@ -1,17 +1,20 @@
 import { create } from "zustand";
+import {
+  formatCurrency as formatCurrencyUtil,
+  formatSignedCurrency as formatSignedCurrencyUtil,
+  getCurrencySymbol as getCurrencySymbolUtil,
+  SUPPORTED_CURRENCIES,
+  DEFAULT_CURRENCY,
+} from "@/modules/currency";
 
-export type AppearanceMode = "system" | "light" | "dark";
-export type CurrencyCode = "USD" | "PHP" | "IDR";
+export type CurrencyCode = string;
+export type AppearanceMode = "light" | "dark" | "system";
 
-export const CURRENCIES: {
-  code: CurrencyCode;
-  symbol: string;
-  name: string;
-}[] = [
-  { code: "USD", symbol: "$", name: "US Dollar" },
-  { code: "PHP", symbol: "₱", name: "Philippine Peso" },
-  { code: "IDR", symbol: "Rp", name: "Indonesian Rupiah" },
-];
+export const CURRENCIES = SUPPORTED_CURRENCIES.map((c) => ({
+  code: c.code.toUpperCase() as CurrencyCode,
+  symbol: c.symbol,
+  name: c.name,
+}));
 
 interface SettingsState {
   appearance: AppearanceMode;
@@ -25,7 +28,7 @@ interface SettingsActions {
 
 const initialState: SettingsState = {
   appearance: "system",
-  currency: "PHP",
+  currency: DEFAULT_CURRENCY.toUpperCase(),
 };
 
 export const useSettingsStore = create<SettingsState & SettingsActions>(
@@ -36,25 +39,21 @@ export const useSettingsStore = create<SettingsState & SettingsActions>(
   }),
 );
 
-export function getCurrencySymbol(code: CurrencyCode): string {
-  return CURRENCIES.find((c) => c.code === code)?.symbol ?? "$";
+export function getCurrencySymbol(code?: CurrencyCode): string {
+  const currency = code ?? useSettingsStore.getState().currency;
+  return getCurrencySymbolUtil(currency.toLowerCase());
 }
 
 export function formatCurrency(amount: number, code?: CurrencyCode): string {
   const currency = code ?? useSettingsStore.getState().currency;
-  const symbol = getCurrencySymbol(currency);
-  const formatted = Math.abs(amount).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  return amount < 0 ? `-${symbol}${formatted}` : `${symbol}${formatted}`;
+  return formatCurrencyUtil(Math.abs(amount), currency.toLowerCase());
 }
 
 export function formatSignedCurrency(
   amount: number,
-  type: "expense" | "income",
+  type: "expense" | "income" | "transfer",
   code?: CurrencyCode,
 ): string {
-  const prefix = type === "expense" ? "-" : "+";
-  return `${prefix}${formatCurrency(amount, code)}`;
+  const currency = code ?? useSettingsStore.getState().currency;
+  return formatSignedCurrencyUtil(amount, type, currency.toLowerCase());
 }

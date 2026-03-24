@@ -20,6 +20,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePayables } from '@/hooks/use-payables';
 import type { Payable } from '@/modules/payable/payable.types';
 import { usePayableStore } from '@/state/payable.store';
+import { formatCurrency, getCurrencySymbol } from '@/state/settings.store';
 
 interface PayableItemProps {
   payable: Payable;
@@ -63,7 +64,7 @@ function PayableItem({ payable, onPress, colors }: PayableItemProps) {
         </View>
         <View className="items-end">
           <Text style={{ color: colors.text }} className="text-base font-bold">
-            ${payable.totalAmount.toLocaleString()}
+            {formatCurrency(payable.totalAmount)}
           </Text>
           {!payable.isPaid && (
             <Text style={{ color: isOverdue ? '#FF6B6B' : colors.textMuted }} className="text-xs">
@@ -84,10 +85,10 @@ function PayableItem({ payable, onPress, colors }: PayableItemProps) {
       </View>
       <View className="flex-row justify-between mt-1">
         <Text style={{ color: colors.textMuted }} className="text-xs">
-          Paid ${(payable.totalAmount - payable.remainingAmount).toLocaleString()}
+          Paid {formatCurrency(payable.totalAmount - payable.remainingAmount)}
         </Text>
         <Text style={{ color: colors.textMuted }} className="text-xs">
-          ${payable.remainingAmount.toLocaleString()} remaining
+          {formatCurrency(payable.remainingAmount)} remaining
         </Text>
       </View>
     </Pressable>
@@ -220,7 +221,7 @@ export default function PayablesScreen() {
         <View className="flex-row items-center justify-between mt-4">
           <View>
             <Text style={{ color: colors.textMuted }} className="text-sm">Total outstanding</Text>
-            <Text style={{ color: colors.text }} className="text-2xl font-bold">${totalOwed.toLocaleString()}</Text>
+            <Text style={{ color: colors.text }} className="text-2xl font-bold">{formatCurrency(totalOwed)}</Text>
           </View>
           <Pressable onPress={() => setShowModal(true)} className="w-10 h-10 rounded-full bg-primary items-center justify-center">
             <Ionicons name="add" size={24} color="#FFFFFF" />

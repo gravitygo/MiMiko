@@ -2,6 +2,7 @@ import { View, Text, Pressable } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import type { BudgetAlertLevel } from '@/modules/budget';
+import { formatCurrency } from '@/state/settings.store';
 
 interface BudgetCardProps {
   id: string;
@@ -88,7 +89,7 @@ export function BudgetCard({
         <View>
           <Text className="text-text-muted dark:text-text-muted-dark text-xs">Spent</Text>
           <Text className="text-text-primary dark:text-text-primary-dark text-base font-semibold">
-            ${spent.toLocaleString()}
+            {formatCurrency(spent)}
           </Text>
         </View>
 
@@ -107,7 +108,7 @@ export function BudgetCard({
             {remaining >= 0 ? 'Remaining' : 'Over'}
           </Text>
           <Text className={`text-base font-semibold ${remaining >= 0 ? 'text-text-primary dark:text-text-primary-dark' : 'text-expense'}`}>
-            ${Math.abs(remaining).toLocaleString()}
+            {formatCurrency(Math.abs(remaining))}
           </Text>
         </View>
       </View>

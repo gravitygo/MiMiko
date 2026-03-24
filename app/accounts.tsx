@@ -7,6 +7,7 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +18,7 @@ import { Colors } from '@/constants/theme';
 import { useAccountStore } from '@/state/account.store';
 import { useAccounts } from '@/hooks/use-accounts';
 import type { Account, AccountType } from '@/modules/account/account.types';
+import { SUPPORTED_CURRENCIES, getCurrencySymbol, formatCurrency } from '@/modules/currency/currency.types';
 
 const ACCOUNT_TYPES: { type: AccountType; label: string; icon: string }[] = [
   { type: 'cash', label: 'Cash', icon: 'cash' },
@@ -65,13 +67,22 @@ function AccountItem({ account, onPress }: AccountItemProps) {
       </View>
       <View className="items-end">
         <Text style={{ color: colors.text }} className="text-base font-bold">
-          ${account.balance.toLocaleString()}
+          {formatCurrency(account.balance, account.currency || 'php')}
         </Text>
-        {account.isDefault && (
-          <View className="bg-primary/20 px-2 py-0.5 rounded-full mt-1">
-            <Text className="text-primary text-xs font-medium">Default</Text>
-          </View>
-        )}
+        <View className="flex-row items-center mt-0.5">
+          {account.currency && account.currency !== 'php' && (
+            <View className="bg-primary/10 px-1.5 py-0.5 rounded mr-1">
+              <Text className="text-primary text-xs font-medium">
+                {account.currency.toUpperCase()}
+              </Text>
+            </View>
+          )}
+          {account.isDefault && (
+            <View className="bg-primary/20 px-2 py-0.5 rounded-full">
+              <Text className="text-primary text-xs font-medium">Default</Text>
+            </View>
+          )}
+        </View>
       </View>
     </Pressable>
   );
@@ -84,10 +95,12 @@ export default function AccountsScreen() {
 
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [name, setName] = useState('');
   const [selectedType, setSelectedType] = useState<AccountType>('cash');
   const [selectedColor, setSelectedColor] = useState(COLORS[0]);
+  const [selectedCurrency, setSelectedCurrency] = useState('php');
   const [balance, setBalance] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -102,6 +115,7 @@ export default function AccountsScreen() {
     setName('');
     setSelectedType('cash');
     setSelectedColor(COLORS[0]);
+    setSelectedCurrency('php');
     setBalance('');
     setEditingAccount(null);
   }, []);
@@ -116,6 +130,7 @@ export default function AccountsScreen() {
     setName(account.name);
     setSelectedType(account.type);
     setSelectedColor(account.color);
+    setSelectedCurrency(account.currency || 'php');
     setBalance(account.balance.toString());
     setShowModal(true);
   }, []);
@@ -138,6 +153,7 @@ export default function AccountsScreen() {
         type: selectedType,
         icon: ACCOUNT_TYPES.find((t) => t.type === selectedType)?.icon || 'cash',
         color: selectedColor,
+        currency: selectedCurrency,
       });
     } else {
       await add({
@@ -145,13 +161,14 @@ export default function AccountsScreen() {
         type: selectedType,
         icon: ACCOUNT_TYPES.find((t) => t.type === selectedType)?.icon || 'cash',
         color: selectedColor,
+        currency: selectedCurrency,
         balance: parsedBalance,
       });
     }
 
     setSubmitting(false);
     handleClose();
-  }, [name, selectedType, selectedColor, balance, editingAccount, add, edit, handleClose]);
+  }, [name, selectedType, selectedColor, selectedCurrency, balance, editingAccount, add, edit, handleClose]);
 
   const handleDelete = useCallback(async () => {
     if (!editingAccount) return;
@@ -291,6 +308,26 @@ export default function AccountsScreen() {
               ))}
             </View>
 
+            {/* Currency */}
+            <Text style={{ color: colors.textSecondary }} className="text-sm mb-2">
+              Currency
+            </Text>
+            <Pressable
+              onPress={() => setShowCurrencyPicker(true)}
+              className="flex-row items-center justify-between rounded-xl px-4 py-3 mb-4"
+              style={{ backgroundColor: colors.surfaceHover }}
+            >
+              <View className="flex-row items-center">
+                <Text style={{ color: colors.text }} className="text-lg font-semibold mr-2">
+                  {getCurrencySymbol(selectedCurrency)}
+                </Text>
+                <Text style={{ color: colors.text }} className="text-base">
+                  {SUPPORTED_CURRENCIES.find(c => c.code === selectedCurrency)?.name || selectedCurrency.toUpperCase()}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            </Pressable>
+
             {/* Balance (only for new accounts) */}
             {!editingAccount && (
               <>
@@ -345,6 +382,68 @@ export default function AccountsScreen() {
             </View>
 
             <View style={{ height: insets.bottom + 16 }} />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Currency Picker Modal */}
+      <Modal
+        visible={showCurrencyPicker}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowCurrencyPicker(false)}
+      >
+        <View className="flex-1 justify-end bg-black/50">
+          <View style={{ backgroundColor: colors.surface }} className="rounded-t-3xl max-h-[70%]">
+            <View className="flex-row items-center justify-between p-6 pb-4">
+              <Text style={{ color: colors.text }} className="text-xl font-bold">
+                Select Currency
+              </Text>
+              <Pressable
+                onPress={() => setShowCurrencyPicker(false)}
+                className="w-8 h-8 rounded-full items-center justify-center"
+                style={{ backgroundColor: colors.surfaceHover }}
+              >
+                <Ionicons name="close" size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            <ScrollView className="px-6" showsVerticalScrollIndicator={false}>
+              {SUPPORTED_CURRENCIES.map((currency) => (
+                <Pressable
+                  key={currency.code}
+                  onPress={() => {
+                    setSelectedCurrency(currency.code);
+                    setShowCurrencyPicker(false);
+                  }}
+                  className="flex-row items-center justify-between py-4 border-b"
+                  style={{ borderColor: colors.surfaceHover }}
+                >
+                  <View className="flex-row items-center">
+                    <View
+                      className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                      style={{ backgroundColor: colors.surfaceHover }}
+                    >
+                      <Text style={{ color: colors.text }} className="text-lg font-semibold">
+                        {currency.symbol}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text style={{ color: colors.text }} className="text-base font-medium">
+                        {currency.code.toUpperCase()}
+                      </Text>
+                      <Text style={{ color: colors.textSecondary }} className="text-sm">
+                        {currency.name}
+                      </Text>
+                    </View>
+                  </View>
+                  {selectedCurrency === currency.code && (
+                    <Ionicons name="checkmark-circle" size={24} color={colors.tint} />
+                  )}
+                </Pressable>
+              ))}
+              <View style={{ height: insets.bottom + 16 }} />
+            </ScrollView>
           </View>
         </View>
       </Modal>

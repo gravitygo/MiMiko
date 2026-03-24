@@ -33,6 +33,7 @@ import type {
 import type { TransactionType } from "@/modules/transaction/transaction.types";
 import { useAccountStore } from "@/state/account.store";
 import { useCategoryStore } from "@/state/category.store";
+import { getCurrencySymbol as getCurrencySymbolUtil } from "@/modules/currency/currency.types";
 
 type TabType = "expense" | "income" | "owe";
 
@@ -282,6 +283,11 @@ export default function AddTransactionScreen() {
       });
     }
 
+    // Refresh accounts to sync store with updated database balances
+    if (transaction) {
+      await fetchAccounts();
+    }
+
     setSubmitting(false);
 
     if (transaction) {
@@ -331,6 +337,16 @@ export default function AddTransactionScreen() {
     activeTab,
     personName,
   ]);
+
+  const selectedAccount = useMemo(
+    () => accounts.find((a) => a.id === selectedAccountId),
+    [accounts, selectedAccountId]
+  );
+
+  const currencySymbol = useMemo(
+    () => getCurrencySymbolUtil(selectedAccount?.currency || "php"),
+    [selectedAccount?.currency]
+  );
 
   if (loading) {
     return (
@@ -409,7 +425,7 @@ export default function AddTransactionScreen() {
           </Text>
           <View className="flex-row items-center bg-surface dark:bg-surface-dark rounded-bento px-4 py-3">
             <Text className="text-text-primary dark:text-text-primary-dark text-2xl font-bold mr-2">
-              $
+              {currencySymbol}
             </Text>
             <TextInput
               value={amount}

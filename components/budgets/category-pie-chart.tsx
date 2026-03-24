@@ -1,6 +1,8 @@
 import { Text, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
+import { formatCurrency } from '@/state/settings.store';
+
 interface CategorySlice {
   id: string;
   name: string;
@@ -89,10 +91,7 @@ export function CategoryPieChart({ slices, totalSpent, budgetAmount }: CategoryP
     }
   }
 
-  const centerLabel = hasBudget
-    ? (isOverBudget ? `$${(totalSpent - budgetAmount).toLocaleString()} over` : `$${(budgetAmount - totalSpent).toLocaleString()} left`)
-    : `$${totalSpent.toLocaleString()}`;
-  const centerSublabel = hasBudget ? `of $${budgetAmount.toLocaleString()}` : 'Total';
+  const centerSublabel = hasBudget ? `of ${formatCurrency(budgetAmount)}` : 'Total';
 
   return (
     <View className="bg-surface dark:bg-surface-dark border border-border/50 dark:border-white/5 rounded-3xl p-4">
@@ -114,8 +113,8 @@ export function CategoryPieChart({ slices, totalSpent, budgetAmount }: CategoryP
           <Text className="text-text-muted dark:text-text-muted-dark text-xs">{centerSublabel}</Text>
           <Text className={`text-lg font-bold ${isOverBudget ? 'text-expense' : 'text-text-primary dark:text-text-primary-dark'}`}>
             {hasBudget
-              ? (isOverBudget ? `$${(totalSpent - budgetAmount).toLocaleString()}` : `$${(budgetAmount - totalSpent).toLocaleString()}`)
-              : `$${totalSpent.toLocaleString()}`}
+              ? formatCurrency(isOverBudget ? totalSpent - budgetAmount : budgetAmount - totalSpent)
+              : formatCurrency(totalSpent)}
           </Text>
           {hasBudget && (
             <Text className={`text-xs font-medium ${isOverBudget ? 'text-expense' : 'text-secondary'}`}>
@@ -146,7 +145,7 @@ export function CategoryPieChart({ slices, totalSpent, budgetAmount }: CategoryP
                 {Math.round(slice.percentage)}%
               </Text>
               <Text className="text-text-primary dark:text-text-primary-dark text-sm font-medium w-20 text-right">
-                ${slice.amount.toLocaleString()}
+                {formatCurrency(slice.amount)}
               </Text>
             </View>
           </View>

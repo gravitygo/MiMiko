@@ -203,15 +203,6 @@ budgets
 dashboard
 ```
 
-Do NOT build:
-
-```
-bank sync
-receipt scanning
-multi-currency
-social features
-```
-
 ---
 
 # 10. DEVELOPMENT STRATEGY

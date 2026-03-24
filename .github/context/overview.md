@@ -61,9 +61,9 @@ UI → Hooks → Service → Repository → Database
 - Balance card: expandable account breakdown (tap to toggle)
 - Transaction filters: type pills, category picker, date presets + custom range
 - Voice mode: long press add button → voice recording modal
-
-### ❌ Not Started
-- AI module (voice → transaction parsing)
+- Transfer screen: account-to-account transfers with multi-currency support
+- Quick Actions: dashboard shortcuts for Transfer and Accounts
+- Multi-currency display: accounts show currency code alongside balance
 
 ---
 
@@ -73,8 +73,9 @@ UI → Hooks → Service → Repository → Database
 
 → [Transaction Module](modules/transaction.md)
 
-- expense + income logic
+- expense, income, transfer logic
 - add / edit / delete transactions
+- transfer support (account to account with fees)
 - main entry for financial data flow
 
 ---

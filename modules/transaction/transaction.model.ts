@@ -9,8 +9,12 @@ export function createTransaction(input: CreateTransactionInput): Transaction {
     type: input.type,
     amount: input.amount,
     description: input.description ?? null,
-    categoryId: input.categoryId,
+    categoryId: input.categoryId ?? null,
     accountId: input.accountId,
+    toAccountId: input.toAccountId ?? null,
+    toAmount: input.toAmount ?? null,
+    fee: input.fee ?? null,
+    exchangeRate: input.exchangeRate ?? null,
     date: input.date,
     recurringRuleId: input.recurringRuleId ?? null,
     createdAt: now,
@@ -24,6 +28,10 @@ export function isExpense(transaction: Transaction): boolean {
 
 export function isIncome(transaction: Transaction): boolean {
   return transaction.type === 'income';
+}
+
+export function isTransfer(transaction: Transaction): boolean {
+  return transaction.type === 'transfer';
 }
 
 export function duplicateTransaction(transaction: Transaction): Transaction {

@@ -17,6 +17,7 @@ import { getMonthDateRange } from '@/modules/budget';
 import { useBudgetStore } from '@/state/budget.store';
 import { useCategoryStore } from '@/state/category.store';
 import { useTransactionStore } from '@/state/transaction.store';
+import { getCurrencySymbol } from '@/state/settings.store';
 
 export default function BudgetsScreen() {
   const insets = useSafeAreaInsets();
@@ -318,7 +319,7 @@ export default function BudgetsScreen() {
             <TextInput
               value={monthlyAmount}
               onChangeText={(t) => setMonthlyAmount(t.replace(/[^0-9.]/g, ''))}
-              placeholder="$0.00"
+              placeholder={`${getCurrencySymbol()}0.00`}
               placeholderTextColor="#71717A"
               keyboardType="numeric"
               autoFocus
@@ -428,7 +429,7 @@ export default function BudgetsScreen() {
             <TextInput
               value={newBudgetAmount}
               onChangeText={setNewBudgetAmount}
-              placeholder="$0.00"
+              placeholder={`${getCurrencySymbol()}0.00`}
               placeholderTextColor="#71717A"
               keyboardType="numeric"
               className="bg-surface-hover dark:bg-surface-hover-dark text-text-primary dark:text-text-primary-dark rounded-2xl px-4 py-3 mb-6"

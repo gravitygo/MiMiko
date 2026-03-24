@@ -1,5 +1,7 @@
 import { View, Text } from 'react-native';
 
+import { formatCurrency } from '@/state/settings.store';
+
 interface BudgetOverviewHeaderProps {
   totalBudget: number;
   totalSpent: number;
@@ -19,7 +21,7 @@ export function BudgetOverviewHeader({ totalBudget, totalSpent, budgetCount }: B
             Total Budget
           </Text>
           <Text className="text-text-primary dark:text-text-primary-dark text-3xl font-bold tracking-tight">
-            ${totalBudget.toLocaleString()}
+            {formatCurrency(totalBudget)}
           </Text>
         </View>
         <View className="items-end">
@@ -45,7 +47,7 @@ export function BudgetOverviewHeader({ totalBudget, totalSpent, budgetCount }: B
         <View>
           <Text className="text-text-muted dark:text-text-muted-dark text-xs">Spent</Text>
           <Text className="text-text-primary dark:text-text-primary-dark text-base font-semibold">
-            ${totalSpent.toLocaleString()}
+            {formatCurrency(totalSpent)}
           </Text>
         </View>
         <View className="items-end">
@@ -53,7 +55,7 @@ export function BudgetOverviewHeader({ totalBudget, totalSpent, budgetCount }: B
             {isOverBudget ? 'Over Budget' : 'Remaining'}
           </Text>
           <Text className={`text-base font-semibold ${isOverBudget ? 'text-expense' : 'text-secondary'}`}>
-            ${Math.abs(remaining).toLocaleString()}
+            {formatCurrency(Math.abs(remaining))}
           </Text>
         </View>
       </View>

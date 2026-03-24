@@ -22,6 +22,9 @@ export function createAccountService() {
         type: input.type ?? existing.type,
         icon: input.icon ?? existing.icon,
         color: input.color ?? existing.color,
+        currency: input.currency ?? existing.currency,
+        billingDate: input.billingDate !== undefined ? input.billingDate : existing.billingDate,
+        deadlineDate: input.deadlineDate !== undefined ? input.deadlineDate : existing.deadlineDate,
         updatedAt: new Date().toISOString(),
       };
 

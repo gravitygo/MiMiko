@@ -88,6 +88,67 @@ export async function initializeDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_voice_logs_created_at ON voice_logs(created_at);
   `);
 
+  // Migration: add currency column to accounts
+  try {
+    await database.execAsync("ALTER TABLE accounts ADD COLUMN currency TEXT DEFAULT 'php'");
+  } catch {
+    // Column already exists
+  }
+
+  // Migration: add billing_date column to accounts (for credit cards)
+  try {
+    await database.execAsync('ALTER TABLE accounts ADD COLUMN billing_date INTEGER');
+  } catch {
+    // Column already exists
+  }
+
+  // Migration: add deadline_date column to accounts (for credit cards)
+  try {
+    await database.execAsync('ALTER TABLE accounts ADD COLUMN deadline_date INTEGER');
+  } catch {
+    // Column already exists
+  }
+
+  // Migration: create exchange_rates table
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS exchange_rates (
+      id TEXT PRIMARY KEY NOT NULL,
+      base_currency TEXT NOT NULL,
+      rates_json TEXT NOT NULL,
+      date TEXT NOT NULL,
+      fetched_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_exchange_rates_base ON exchange_rates(base_currency);
+  `);
+
+  // Migration: add to_account_id column to transactions (for transfers)
+  try {
+    await database.execAsync('ALTER TABLE transactions ADD COLUMN to_account_id TEXT REFERENCES accounts(id)');
+  } catch {
+    // Column already exists
+  }
+
+  // Migration: add fee column to transactions (for transfer fees)
+  try {
+    await database.execAsync('ALTER TABLE transactions ADD COLUMN fee REAL DEFAULT 0');
+  } catch {
+    // Column already exists
+  }
+
+  // Migration: add to_amount column to transactions (for multi-currency transfers)
+  try {
+    await database.execAsync('ALTER TABLE transactions ADD COLUMN to_amount REAL');
+  } catch {
+    // Column already exists
+  }
+
+  // Migration: add exchange_rate column to transactions (for currency conversion)
+  try {
+    await database.execAsync('ALTER TABLE transactions ADD COLUMN exchange_rate REAL');
+  } catch {
+    // Column already exists
+  }
+
   await seedDefaultData(database);
 }
 

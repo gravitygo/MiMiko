@@ -1,6 +1,6 @@
 # Account Module
 
-Manages financial accounts (wallets) with balance tracking and credit/debit operations.
+Manages financial accounts (wallets) with balance tracking, multi-currency support, and credit card billing.
 
 ---
 
@@ -8,16 +8,16 @@ Manages financial accounts (wallets) with balance tracking and credit/debit oper
 
 Types:
 - `AccountType`: 'cash' | 'bank' | 'credit_card' | 'e_wallet'
-- `Account`: domain entity (id, name, type, balance, icon, color, isDefault, timestamps)
+- `Account`: domain entity (id, name, type, balance, currency, icon, color, isDefault, billingDate?, deadlineDate?, timestamps)
 - `AccountRow`: DB row shape (snake_case)
-- `CreateAccountInput`: name, type, balance?, icon?, color?
+- `CreateAccountInput`: name, type, balance?, currency?, icon?, color?, billingDate?, deadlineDate?
 - `UpdateAccountInput`: all fields optional
 
 ---
 
 ## account.model.ts
 
-- `createAccount(input)`: builds new Account with UUID + timestamps, default balance 0
+- `createAccount(input)`: builds new Account with UUID + timestamps, default balance 0, currency 'php'
 - `adjustBalance(account, amount)`: returns new Account with adjusted balance
 
 ---
@@ -42,7 +42,7 @@ Factory: `createAccountRepository()`
 Factory: `createAccountService()`
 
 - `add(input)`: create + persist
-- `edit(id, input)`: update metadata (not balance)
+- `edit(id, input)`: update metadata (not balance), supports currency and billing dates
 - `remove(id)`: delete account
 - `getById(id)`: single fetch
 - `getAll()`: all accounts
@@ -55,9 +55,26 @@ Factory: `createAccountService()`
 
 ---
 
+## credit-card.service.ts
+
+Factory: `createCreditCardService()`
+
+- `getBillingInfo(account)`: returns billing cycle info + aggregated amounts
+- `countOccurrencesInPeriod(rule, start, end)`: counts recurring occurrences in period
+- `getNextOccurrence(date, frequency)`: calculates next recurring date
+- `getCreditCardReminders()`: all credit card reminders with due dates
+- `getDueReminders(daysAhead)`: reminders due within N days
+
+Types:
+- `CreditCardBillingInfo`: billing cycle dates, amounts, grand total
+- `CreditCardReminder`: account info, amount, deadline, overdue status
+
+---
+
 ## account.mapper.ts
 
 - `mapRowToAccount(row)`: DB row → domain entity
+- `mapAccountToRow(account)`: domain entity → DB row
 
 ---
 
@@ -69,9 +86,12 @@ Factory: `createAccountService()`
 | name | TEXT | display name |
 | type | TEXT | 'cash', 'bank', etc |
 | balance | REAL | current balance |
+| currency | TEXT | currency code (default 'php') |
 | icon | TEXT | icon identifier |
 | color | TEXT | hex color |
 | is_default | INTEGER | 1 = default account |
+| billing_date | INTEGER | day of month (1-31), credit cards only |
+| deadline_date | INTEGER | day of month (1-31), credit cards only |
 | created_at | TEXT | ISO timestamp |
 | updated_at | TEXT | ISO timestamp |
 
@@ -80,9 +100,15 @@ Factory: `createAccountService()`
 ## Usage Pattern
 
 ```ts
+// Basic account operations
 const service = createAccountService();
 const account = await service.getDefault();
 await service.debit(account.id, 50000); // expense
 await service.credit(account.id, 100000); // income
+
+// Credit card billing
+const ccService = createCreditCardService();
+const reminders = await ccService.getDueReminders(7);
+const billingInfo = await ccService.getBillingInfo(creditCardAccount);
 ```
 

@@ -272,25 +272,27 @@ export default function SettingsScreen() {
       {/* Currency Modal */}
       <Modal visible={showCurrency} animationType="fade" transparent onRequestClose={() => setShowCurrency(false)}>
         <Pressable className="flex-1 bg-black/50 justify-end" onPress={() => setShowCurrency(false)}>
-          <View style={{ backgroundColor: colors.surface }} className="rounded-t-3xl p-6" onStartShouldSetResponder={() => true}>
-            <Text style={{ color: colors.text }} className="text-lg font-bold mb-4">Currency</Text>
-            {CURRENCIES.map((c) => (
-              <Pressable
-                key={c.code}
-                onPress={() => { setCurrency(c.code); setShowCurrency(false); }}
-                className="flex-row items-center py-3.5"
-              >
-                <Text style={{ color: currency === c.code ? colors.tint : colors.textSecondary }} className="text-lg font-semibold w-10">{c.symbol}</Text>
-                <View className="flex-1 ml-2">
-                  <Text style={{ color: colors.text }} className="text-base font-medium">{c.name}</Text>
-                  <Text style={{ color: colors.textSecondary }} className="text-sm">{c.code}</Text>
-                </View>
-                {currency === c.code && (
-                  <Ionicons name="checkmark-circle" size={22} color={colors.tint} />
-                )}
-              </Pressable>
-            ))}
-            <View style={{ height: insets.bottom + 8 }} />
+          <View style={{ backgroundColor: colors.surface, maxHeight: '70%' }} className="rounded-t-3xl" onStartShouldSetResponder={() => true}>
+            <Text style={{ color: colors.text }} className="text-lg font-bold px-6 pt-6 pb-4">Currency</Text>
+            <ScrollView className="px-6" showsVerticalScrollIndicator={false}>
+              {CURRENCIES.map((c) => (
+                <Pressable
+                  key={c.code}
+                  onPress={() => { setCurrency(c.code); setShowCurrency(false); }}
+                  className="flex-row items-center py-3.5"
+                >
+                  <Text style={{ color: currency === c.code ? colors.tint : colors.textSecondary }} className="text-lg font-semibold w-10">{c.symbol}</Text>
+                  <View className="flex-1 ml-2">
+                    <Text style={{ color: colors.text }} className="text-base font-medium">{c.name}</Text>
+                    <Text style={{ color: colors.textSecondary }} className="text-sm">{c.code}</Text>
+                  </View>
+                  {currency === c.code && (
+                    <Ionicons name="checkmark-circle" size={22} color={colors.tint} />
+                  )}
+                </Pressable>
+              ))}
+              <View style={{ height: insets.bottom + 8 }} />
+            </ScrollView>
           </View>
         </Pressable>
       </Modal>

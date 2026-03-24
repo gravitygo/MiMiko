@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { formatCurrency } from '@/state/settings.store';
+import { formatCurrency as formatWithCurrency } from '@/modules/currency/currency.types';
 import { BentoCard } from './bento-card';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -14,6 +15,7 @@ interface AccountBreakdown {
   icon: string;
   color: string;
   type: string;
+  currency?: string;
 }
 
 interface BalanceCardProps {
@@ -105,13 +107,22 @@ export function BalanceCard({ totalBalance, income, expense, committed, sparklin
                 <Text className="text-text-primary dark:text-text-primary-dark text-sm flex-1" numberOfLines={1}>
                   {acc.name}
                 </Text>
-                <Text
-                  className={`text-sm font-semibold ${
-                    acc.balance >= 0 ? 'text-secondary' : 'text-expense'
-                  }`}
-                >
-                  {formatCurrency(acc.balance)}
-                </Text>
+                <View className="flex-row items-center">
+                  {acc.currency && acc.currency !== 'php' && (
+                    <View className="bg-primary/10 px-1 py-0.5 rounded mr-1.5">
+                      <Text className="text-primary text-[10px] font-medium">
+                        {acc.currency.toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <Text
+                    className={`text-sm font-semibold ${
+                      acc.balance >= 0 ? 'text-secondary' : 'text-expense'
+                    }`}
+                  >
+                    {formatWithCurrency(acc.balance, acc.currency || 'php')}
+                  </Text>
+                </View>
               </View>
             ))}
           </View>

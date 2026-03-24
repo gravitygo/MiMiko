@@ -18,26 +18,34 @@ export const CREATE_TABLES = `
     name TEXT NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('cash', 'bank', 'credit_card', 'e_wallet')),
     balance REAL DEFAULT 0,
+    currency TEXT DEFAULT 'php',
     icon TEXT NOT NULL,
     color TEXT NOT NULL,
     is_default INTEGER DEFAULT 0,
+    billing_date INTEGER,
+    deadline_date INTEGER,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS transactions (
     id TEXT PRIMARY KEY NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('expense', 'income')),
+    type TEXT NOT NULL CHECK (type IN ('expense', 'income', 'transfer')),
     amount REAL NOT NULL,
     description TEXT,
-    category_id TEXT NOT NULL,
+    category_id TEXT,
     account_id TEXT NOT NULL,
+    to_account_id TEXT,
+    to_amount REAL,
+    exchange_rate REAL,
+    fee REAL DEFAULT 0,
     date TEXT NOT NULL,
     recurring_rule_id TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (category_id) REFERENCES categories(id),
-    FOREIGN KEY (account_id) REFERENCES accounts(id)
+    FOREIGN KEY (account_id) REFERENCES accounts(id),
+    FOREIGN KEY (to_account_id) REFERENCES accounts(id)
   );
 
   CREATE TABLE IF NOT EXISTS budgets (

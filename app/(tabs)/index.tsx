@@ -14,6 +14,7 @@ import {
 import { useAccounts } from '@/hooks/use-accounts';
 import { useBudgets } from '@/hooks/use-budgets';
 import { useCategories } from '@/hooks/use-categories';
+import { useTotalBalance } from '@/hooks/use-currency';
 import { useDebts } from '@/hooks/use-debts';
 import { useRecurring } from '@/hooks/use-recurring';
 import { useTransactions } from '@/hooks/use-transactions';
@@ -72,9 +73,8 @@ export default function HomeScreen() {
   const recurringRules = useRecurringStore((state) => state.rules);
   const debts = useDebtStore((state) => state.debts);
 
-  const totalBalance = useMemo(() => {
-    return accounts.reduce((sum, account) => sum + account.balance, 0);
-  }, [accounts]);
+  // Use currency conversion hook for total balance across all accounts
+  const { totalBalance } = useTotalBalance(accounts);
 
   // Single monthly budget (parent of all category budgets)
   const monthlyBudget = useMemo(
@@ -479,8 +479,31 @@ export default function HomeScreen() {
           icon: a.icon,
           color: a.color,
           type: a.type,
+          currency: a.currency,
         }))}
       />
+
+      {/* Quick Actions */}
+      <View className="flex-row mt-4 gap-3">
+        <Pressable
+          onPress={() => router.push('/transfer')}
+          className="flex-1 bg-surface dark:bg-surface-dark border border-border/50 dark:border-white/5 rounded-2xl py-3 px-4 flex-row items-center justify-center active:opacity-70"
+        >
+          <Ionicons name="swap-horizontal" size={18} color="#6366F1" />
+          <Text className="text-text-primary dark:text-text-primary-dark text-sm font-medium ml-2">
+            Transfer
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.push('/accounts')}
+          className="flex-1 bg-surface dark:bg-surface-dark border border-border/50 dark:border-white/5 rounded-2xl py-3 px-4 flex-row items-center justify-center active:opacity-70"
+        >
+          <Ionicons name="wallet-outline" size={18} color="#05DF72" />
+          <Text className="text-text-primary dark:text-text-primary-dark text-sm font-medium ml-2">
+            Accounts
+          </Text>
+        </Pressable>
+      </View>
 
       {/* Reminders Section */}
       {reminderItems.length > 0 && (

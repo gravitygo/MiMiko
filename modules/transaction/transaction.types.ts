@@ -1,12 +1,17 @@
-export type TransactionType = 'expense' | 'income';
+export type TransactionType = 'expense' | 'income' | 'transfer';
 
 export interface Transaction {
   id: string;
   type: TransactionType;
   amount: number;
   description: string | null;
-  categoryId: string;
+  categoryId: string | null;
   accountId: string;
+  // Transfer specific fields
+  toAccountId: string | null;
+  toAmount: number | null; // Amount received in destination currency
+  fee: number | null;
+  exchangeRate: number | null; // Rate used for currency conversion
   date: string;
   recurringRuleId: string | null;
   createdAt: string;
@@ -18,8 +23,12 @@ export interface TransactionRow {
   type: string;
   amount: number;
   description: string | null;
-  category_id: string;
+  category_id: string | null;
   account_id: string;
+  to_account_id: string | null;
+  to_amount: number | null;
+  fee: number | null;
+  exchange_rate: number | null;
   date: string;
   recurring_rule_id: string | null;
   created_at: string;
@@ -30,8 +39,12 @@ export interface CreateTransactionInput {
   type: TransactionType;
   amount: number;
   description?: string;
-  categoryId: string;
+  categoryId?: string;
   accountId: string;
+  toAccountId?: string;
+  toAmount?: number;
+  fee?: number;
+  exchangeRate?: number;
   date: string;
   recurringRuleId?: string;
 }
@@ -42,6 +55,10 @@ export interface UpdateTransactionInput {
   description?: string;
   categoryId?: string;
   accountId?: string;
+  toAccountId?: string;
+  toAmount?: number;
+  fee?: number;
+  exchangeRate?: number;
   date?: string;
 }
 
