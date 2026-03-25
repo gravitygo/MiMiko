@@ -1,7 +1,8 @@
 import { getDatabase } from '@/database';
-import type { Account } from './account.types';
-import type { Transaction } from '@/modules/transaction/transaction.types';
-import type { RecurringRule } from '@/modules/recurring/recurring.types';
+import { mapRowToAccount } from './account.mapper';
+import type { Account, AccountRow } from './account.types';
+import type { RecurringRule, RecurringRuleRow } from '@/modules/recurring/recurring.types';
+import { mapRowToRecurringRule } from '@/modules/recurring/recurring.mapper';
 
 export interface CreditCardBillingInfo {
   account: Account;
@@ -95,13 +96,14 @@ export function createCreditCardService() {
       const transactionData = transactions[0] || { amount: 0, count: 0 };
 
       // Get recurring expenses that fall within billing cycle
-      const recurringRules = await db.getAllAsync<RecurringRule>(
+      const recurringRows = await db.getAllAsync<RecurringRuleRow>(
         `SELECT * FROM recurring_rules
          WHERE account_id = ?
          AND type = 'expense'
          AND is_active = 1`,
         [account.id]
       );
+      const recurringRules = recurringRows.map(mapRowToRecurringRule);
 
       let recurringAmount = 0;
       let recurringCount = 0;
@@ -187,12 +189,13 @@ export function createCreditCardService() {
     async getCreditCardReminders(): Promise<CreditCardReminder[]> {
       const db = await getDatabase();
 
-      const creditCards = await db.getAllAsync<Account>(
+      const rows = await db.getAllAsync<AccountRow>(
         `SELECT * FROM accounts
          WHERE type = 'credit_card'
          AND billing_date IS NOT NULL
          AND deadline_date IS NOT NULL`
       );
+      const creditCards = rows.map(mapRowToAccount);
 
       const reminders: CreditCardReminder[] = [];
       const today = new Date();

@@ -18,6 +18,7 @@ import { useTotalBalance } from '@/hooks/use-currency';
 import { useDebts } from '@/hooks/use-debts';
 import { useRecurring } from '@/hooks/use-recurring';
 import { useTransactions } from '@/hooks/use-transactions';
+import { createCreditCardService, type CreditCardReminder } from '@/modules/account/credit-card.service';
 import { createDebtRepository } from '@/modules/debt/debt.repository';
 import { calculateNextDate } from '@/modules/recurring/recurring.model';
 import { createRecurringService } from '@/modules/recurring/recurring.service';
@@ -56,6 +57,7 @@ export default function HomeScreen() {
   const [recurringUndoStack, setRecurringUndoStack] = useState<Map<string, UndoAction[]>>(new Map());
   // Debts: single undo with time limit
   const [debtUndoMap, setDebtUndoMap] = useState<Map<string, UndoAction>>(new Map());
+  const [ccReminders, setCcReminders] = useState<CreditCardReminder[]>([]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -177,7 +179,7 @@ export default function HomeScreen() {
     return payableTotal + recurringTotal;
   }, [debts, recurringRules]);
 
-  // Build reminder items from recurring rules + unsettled debts
+  // Build reminder items from recurring rules + unsettled debts + credit card billing
   const reminderItems = useMemo<ReminderItem[]>(() => {
     const today = new Date().toISOString().split('T')[0];
     const now = Date.now();
@@ -232,6 +234,31 @@ export default function HomeScreen() {
       });
     }
 
+    // Credit card billing reminders
+    for (const cc of ccReminders) {
+      const dueLabel = cc.isOverdue
+        ? 'Overdue'
+        : cc.daysUntilDeadline === 0
+        ? 'Due today'
+        : `Due ${cc.deadlineDate}`;
+
+      const billingEndFormatted = new Date(cc.billingDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+      items.push({
+        id: cc.accountId,
+        type: 'credit_card',
+        title: cc.accountName,
+        subtitle: `Credit card · cycle ends ${billingEndFormatted}`,
+        amount: cc.amount,
+        icon: 'card' as IconName,
+        iconColor: '#0084D1',
+        dueDate: cc.deadlineDate,
+        dueLabel,
+        isOverdue: cc.isOverdue,
+        direction: 'payable',
+      });
+    }
+
     // Sort: overdue first, then chronologically by due date (earliest first)
     return items.sort((a, b) => {
       if (a.isOverdue && !b.isOverdue) return -1;
@@ -240,7 +267,7 @@ export default function HomeScreen() {
       const dateB = b.dueDate ?? '9999-12-31';
       return dateA.localeCompare(dateB);
     });
-  }, [recurringRules, debts, categories, recurringUndoStack, debtUndoMap]);
+  }, [recurringRules, debts, ccReminders, categories, recurringUndoStack, debtUndoMap]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -261,6 +288,9 @@ export default function HomeScreen() {
       fetchRecurring(),
       fetchDebts(),
     ]);
+    const ccService = createCreditCardService();
+    const reminders = await ccService.getCreditCardReminders();
+    setCcReminders(reminders);
   }, [fetchAccounts, fetchTransactions, fetchCategories, fetchBudgetStatuses, fetchRecurring, fetchDebts]);
 
   useFocusEffect(
@@ -437,6 +467,8 @@ export default function HomeScreen() {
   const handleReminderPress = useCallback((id: string, type: ReminderType) => {
     if (type === 'recurring') {
       router.push({ pathname: '/recurring', params: { editId: id } });
+    } else if (type === 'credit_card') {
+      router.push('/accounts');
     }
   }, [router]);
 

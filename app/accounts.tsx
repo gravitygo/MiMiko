@@ -102,6 +102,8 @@ export default function AccountsScreen() {
   const [selectedColor, setSelectedColor] = useState(COLORS[0]);
   const [selectedCurrency, setSelectedCurrency] = useState('php');
   const [balance, setBalance] = useState('');
+  const [billingDate, setBillingDate] = useState('');
+  const [deadlineDate, setDeadlineDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const accounts = useAccountStore((s) => s.accounts);
@@ -117,6 +119,8 @@ export default function AccountsScreen() {
     setSelectedColor(COLORS[0]);
     setSelectedCurrency('php');
     setBalance('');
+    setBillingDate('');
+    setDeadlineDate('');
     setEditingAccount(null);
   }, []);
 
@@ -132,6 +136,8 @@ export default function AccountsScreen() {
     setSelectedColor(account.color);
     setSelectedCurrency(account.currency || 'php');
     setBalance(account.balance.toString());
+    setBillingDate(account.billingDate?.toString() ?? '');
+    setDeadlineDate(account.deadlineDate?.toString() ?? '');
     setShowModal(true);
   }, []);
 
@@ -146,6 +152,12 @@ export default function AccountsScreen() {
     setSubmitting(true);
 
     const parsedBalance = parseFloat(balance) || 0;
+    const parsedBillingDate = selectedType === 'credit_card' && billingDate.trim()
+      ? Math.min(31, Math.max(1, parseInt(billingDate, 10) || 1))
+      : undefined;
+    const parsedDeadlineDate = selectedType === 'credit_card' && deadlineDate.trim()
+      ? Math.min(31, Math.max(1, parseInt(deadlineDate, 10) || 1))
+      : undefined;
 
     if (editingAccount) {
       await edit(editingAccount.id, {
@@ -154,6 +166,8 @@ export default function AccountsScreen() {
         icon: ACCOUNT_TYPES.find((t) => t.type === selectedType)?.icon || 'cash',
         color: selectedColor,
         currency: selectedCurrency,
+        billingDate: parsedBillingDate,
+        deadlineDate: parsedDeadlineDate,
       });
     } else {
       await add({
@@ -163,12 +177,14 @@ export default function AccountsScreen() {
         color: selectedColor,
         currency: selectedCurrency,
         balance: parsedBalance,
+        billingDate: parsedBillingDate,
+        deadlineDate: parsedDeadlineDate,
       });
     }
 
     setSubmitting(false);
     handleClose();
-  }, [name, selectedType, selectedColor, selectedCurrency, balance, editingAccount, add, edit, handleClose]);
+  }, [name, selectedType, selectedColor, selectedCurrency, balance, billingDate, deadlineDate, editingAccount, add, edit, handleClose]);
 
   const handleDelete = useCallback(async () => {
     if (!editingAccount) return;
@@ -340,6 +356,38 @@ export default function AccountsScreen() {
                   placeholder="0.00"
                   placeholderTextColor={colors.textMuted}
                   keyboardType="decimal-pad"
+                  style={{ backgroundColor: colors.surfaceHover, color: colors.text }}
+                  className="rounded-xl px-4 py-3 mb-4"
+                />
+              </>
+            )}
+
+            {/* Credit Card Fields */}
+            {selectedType === 'credit_card' && (
+              <>
+                <Text style={{ color: colors.textSecondary }} className="text-sm mb-2">
+                  Billing Day of Month
+                </Text>
+                <TextInput
+                  value={billingDate}
+                  onChangeText={(v) => setBillingDate(v.replace(/[^0-9]/g, ''))}
+                  placeholder="e.g. 25 (day 1–31)"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                  style={{ backgroundColor: colors.surfaceHover, color: colors.text }}
+                  className="rounded-xl px-4 py-3 mb-4"
+                />
+                <Text style={{ color: colors.textSecondary }} className="text-sm mb-2">
+                  Payment Due Day of Month
+                </Text>
+                <TextInput
+                  value={deadlineDate}
+                  onChangeText={(v) => setDeadlineDate(v.replace(/[^0-9]/g, ''))}
+                  placeholder="e.g. 15 (day 1–31)"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="number-pad"
+                  maxLength={2}
                   style={{ backgroundColor: colors.surfaceHover, color: colors.text }}
                   className="rounded-xl px-4 py-3 mb-4"
                 />
