@@ -17,6 +17,7 @@ export function createTransaction(input: CreateTransactionInput): Transaction {
     exchangeRate: input.exchangeRate ?? null,
     date: input.date,
     recurringRuleId: input.recurringRuleId ?? null,
+    isGhost: input.isGhost ?? false,
     createdAt: now,
     updatedAt: now,
   };

@@ -39,6 +39,15 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 const BOTTOM_NAV_HEIGHT = 130;
 const UNDO_EXPIRY_MS = 30_000;
 
+/** Returns the current date as a YYYY-MM-DD string using local time (avoids UTC timezone offset). */
+function todayLocalDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 function formatFrequency(frequency: string, customDays?: number[] | null): string {
   if (frequency === 'custom' && customDays?.length) {
@@ -104,7 +113,9 @@ export default function HomeScreen() {
 
   const { monthlyIncome, monthlyExpense } = useMemo(() => {
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const startOfMonth = `${y}-${m}-01`;
 
     return transactions.reduce(
       (acc, t) => {
@@ -126,9 +137,11 @@ export default function HomeScreen() {
     const days: number[] = [];
     const today = new Date();
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+      const dy = d.getFullYear();
+      const dm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${dy}-${dm}-${dd}`;
       const dayTotal = transactions
         .filter((t) => t.date.startsWith(dateStr) && t.type === 'expense')
         .reduce((sum, t) => sum + t.amount, 0);
@@ -139,7 +152,9 @@ export default function HomeScreen() {
 
   const topCategories = useMemo(() => {
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const startOfMonth = `${y}-${m}-01`;
     const categorySpending: Record<string, number> = {};
 
     transactions.forEach((t) => {
@@ -202,7 +217,7 @@ export default function HomeScreen() {
 
   // Build reminder items from recurring rules + unsettled debts + credit card billing
   const reminderItems = useMemo<ReminderItem[]>(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayLocalDate();
     const now = Date.now();
     const items: ReminderItem[] = [];
 
@@ -344,7 +359,7 @@ export default function HomeScreen() {
         description: rule.description ?? rule.name,
         categoryId: rule.categoryId,
         accountId: rule.accountId,
-        date: new Date().toISOString(),
+        date: todayLocalDate(),
         recurringRuleId: rule.id,
       });
 
@@ -385,7 +400,7 @@ export default function HomeScreen() {
         description: `${debt.direction === 'payable' ? 'Paid' : 'Received from'} ${debt.personName}${debt.description ? ': ' + debt.description : ''}`,
         categoryId: debt.categoryId ?? 'cat_transfers',
         accountId: debt.accountId ?? 'acc_cash',
-        date: new Date().toISOString(),
+        date: todayLocalDate(),
       });
 
       // Mark debt as settled
@@ -528,7 +543,7 @@ export default function HomeScreen() {
         description: `Credit card payment: ${ccPaymentModal.accountName}`,
         categoryId: 'cat_transfers',
         accountId: ccPayFromAccountId,
-        date: new Date().toISOString(),
+        date: todayLocalDate(),
       });
 
       // Record income on the credit card account (reduces outstanding balance/debt)
@@ -538,7 +553,7 @@ export default function HomeScreen() {
         description: `Credit card payment received: ${ccPaymentModal.accountName}`,
         categoryId: 'cat_transfers',
         accountId: ccPaymentModal.accountId,
-        date: new Date().toISOString(),
+        date: todayLocalDate(),
       });
 
       // Update the cycle's paid amount (auto-closes if fully paid)

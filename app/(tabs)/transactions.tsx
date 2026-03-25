@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -27,9 +27,12 @@ import type {
   TransactionFilter,
 } from "@/modules/transaction/transaction.types";
 import { formatSignedCurrency } from "@/modules/currency/currency.types";
+import { createCreditCardCycleService } from "@/modules/account/credit-card-cycle.service";
+import type { CreditCardCycleWithTotal } from "@/modules/account/credit-card-cycle.types";
 import { useAccountStore } from "@/state/account.store";
 import { useCategoryStore } from "@/state/category.store";
 import { useTransactionStore } from "@/state/transaction.store";
+import { formatCurrency } from "@/state/settings.store";
 
 interface TransactionItemProps {
   transaction: Transaction;
@@ -59,7 +62,7 @@ function TransactionItem({
     transaction.type as "expense" | "income" | "transfer",
     accountCurrency
   );
-  const formattedDate = new Date(transaction.date).toLocaleDateString("en-US", {
+  const formattedDate = new Date(transaction.date.includes('T') ? transaction.date : transaction.date + 'T00:00:00').toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
   });
@@ -68,6 +71,7 @@ function TransactionItem({
     <Pressable
       onPress={() => onPress(transaction.id)}
       className="flex-row items-center px-4 py-3 bg-surface dark:bg-surface-dark mx-4 mb-2 rounded-bento"
+      style={{ opacity: transaction.isGhost ? 0.85 : 1 }}
     >
       <View
         className="w-10 h-10 rounded-full items-center justify-center mr-3"
@@ -77,9 +81,16 @@ function TransactionItem({
       </View>
 
       <View className="flex-1">
-        <Text className="text-text-primary dark:text-text-primary-dark font-medium text-base">
-          {categoryName}
-        </Text>
+        <View className="flex-row items-center gap-1.5">
+          <Text className="text-text-primary dark:text-text-primary-dark font-medium text-base">
+            {categoryName}
+          </Text>
+          {transaction.isGhost && (
+            <View className="bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded">
+              <Text className="text-amber-700 dark:text-amber-400 text-xs font-medium">Committed</Text>
+            </View>
+          )}
+        </View>
         <Text className="text-text-muted dark:text-text-muted-dark text-sm">
           {transaction.description || accountName}
         </Text>
@@ -100,6 +111,14 @@ function TransactionItem({
   );
 }
 
+/** Returns a YYYY-MM-DD date string using local time (no UTC offset). */
+function toLocalDateStr(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 interface DateGroup {
   title: string;
   data: Transaction[];
@@ -107,8 +126,10 @@ interface DateGroup {
 
 function groupByDate(transactions: Transaction[]): DateGroup[] {
   const groups: Record<string, Transaction[]> = {};
-  const today = new Date().toISOString().split("T")[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+  const now = new Date();
+  const today = toLocalDateStr(now);
+  const yesterdayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const yesterday = toLocalDateStr(yesterdayDate);
 
   for (const t of transactions) {
     const key = t.date.split("T")[0];
@@ -125,7 +146,7 @@ function groupByDate(transactions: Transaction[]): DateGroup[] {
       } else if (key === yesterday) {
         title = "Yesterday";
       } else {
-        title = new Date(key).toLocaleDateString("en-US", {
+        title = new Date(key + "T00:00:00").toLocaleDateString("en-US", {
           weekday: "long",
           month: "short",
           day: "numeric",
@@ -154,19 +175,18 @@ function getDateRange(preset: DatePreset): {
   endDate?: string;
 } {
   const now = new Date();
-  const today = now.toISOString().split("T")[0];
+  const today = toLocalDateStr(now);
 
   switch (preset) {
     case "today":
-      return { startDate: today, endDate: today + "T23:59:59" };
+      return { startDate: today, endDate: today };
     case "week": {
-      const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - now.getDay());
-      return { startDate: weekStart.toISOString().split("T")[0] };
+      const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+      return { startDate: toLocalDateStr(weekStart) };
     }
     case "month": {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { startDate: monthStart.toISOString().split("T")[0] };
+      return { startDate: toLocalDateStr(monthStart) };
     }
     default:
       return {};
@@ -181,7 +201,10 @@ export default function TransactionsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
-  // Filter state
+  // Main view tab
+  const [activeTab, setActiveTab] = useState<"transactions" | "credit_cards">("transactions");
+
+  // Filter state (for transactions tab)
   const [filterType, setFilterType] = useState<"all" | "expense" | "income">(
     "all",
   );
@@ -190,6 +213,14 @@ export default function TransactionsScreen() {
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
   const [showFilterModal, setShowFilterModal] = useState(false);
+
+  // Credit card cycles state
+  const [ccCycles, setCcCycles] = useState<CreditCardCycleWithTotal[]>([]);
+  const [ccCycleTransactions, setCcCycleTransactions] = useState<
+    Record<string, { id: string; amount: number; description: string | null; date: string; categoryId: string | null }[]>
+  >({});
+  const [expandedCycleId, setExpandedCycleId] = useState<string | null>(null);
+  const [ccLoading, setCcLoading] = useState(false);
 
   const transactions = useTransactionStore((s) => s.transactions);
   const categories = useCategoryStore((s) => s.categories);
@@ -245,7 +276,7 @@ export default function TransactionsScreen() {
 
     if (filterDatePreset === "custom") {
       if (filterStartDate) filter.startDate = filterStartDate;
-      if (filterEndDate) filter.endDate = filterEndDate + "T23:59:59";
+      if (filterEndDate) filter.endDate = filterEndDate;
     } else {
       const range = getDateRange(filterDatePreset);
       if (range.startDate) filter.startDate = range.startDate;
@@ -269,17 +300,40 @@ export default function TransactionsScreen() {
     ]);
   }, [fetchTransactions, fetchCategories, fetchAccounts, activeFilter]);
 
+  const loadCreditCardCycles = useCallback(async () => {
+    setCcLoading(true);
+    try {
+      const cycleService = createCreditCardCycleService();
+      const cycles = await cycleService.getActiveCycles();
+      setCcCycles(cycles);
+    } finally {
+      setCcLoading(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       loadData().finally(() => setInitialLoading(false));
-    }, [loadData]),
+      loadCreditCardCycles();
+    }, [loadData, loadCreditCardCycles]),
   );
+
+  // Load transactions for a specific cycle when expanded
+  useEffect(() => {
+    if (!expandedCycleId) return;
+    const cycle = ccCycles.find((c) => c.id === expandedCycleId);
+    if (!cycle) return;
+    const cycleService = createCreditCardCycleService();
+    cycleService.getTransactionsForCycle(cycle).then((txs) => {
+      setCcCycleTransactions((prev) => ({ ...prev, [expandedCycleId]: txs }));
+    });
+  }, [expandedCycleId, ccCycles]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadData();
+    await Promise.all([loadData(), loadCreditCardCycles()]);
     setRefreshing(false);
-  }, [loadData]);
+  }, [loadData, loadCreditCardCycles]);
 
   const handlePress = useCallback(
     (id: string) => {
@@ -305,9 +359,7 @@ export default function TransactionsScreen() {
     await editTransaction(editingTx.id, {
       amount: parsedAmount,
       description: editDescription.trim() || undefined,
-      date: editDate
-        ? new Date(editDate + "T00:00:00").toISOString()
-        : undefined,
+      date: editDate || undefined,
       categoryId: editCategoryId ?? undefined,
       accountId: editAccountId ?? undefined,
     });
@@ -360,7 +412,7 @@ export default function TransactionsScreen() {
       }
 
       const t = item.data;
-      const cat = categoryMap.get(t.categoryId);
+      const cat = categoryMap.get(t.categoryId ?? "");
       const acc = accountMap.get(t.accountId);
 
       return (
@@ -408,182 +460,364 @@ export default function TransactionsScreen() {
     );
   }
 
-  if (transactions.length === 0 && !hasActiveFilters) {
-    return (
-      <View
-        className="flex-1 bg-background dark:bg-background-dark items-center justify-center px-8"
-        style={{ paddingTop: insets.top }}
-      >
-        <View className="w-20 h-20 rounded-full bg-surface dark:bg-surface-dark items-center justify-center mb-4">
-          <Ionicons name="receipt-outline" size={40} color={colors.textMuted} />
-        </View>
-        <Text className="text-text-primary dark:text-text-primary-dark text-xl font-semibold mb-2">
-          No transactions yet
-        </Text>
-        <Text className="text-text-muted dark:text-text-muted-dark text-center mb-6">
-          Start tracking your expenses by adding your first transaction
-        </Text>
-        <Pressable
-          onPress={handleAddPress}
-          className="bg-primary px-6 py-3 rounded-bento"
-        >
-          <Text className="text-white font-semibold">Add Transaction</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
   return (
     <View className="flex-1 bg-background dark:bg-background-dark">
-      {/* Filter Bar */}
-      <View
-        style={{ paddingTop: insets.top + 8 }}
-        className="px-4 pb-2 bg-background dark:bg-background-dark"
-      >
-        {/* Type Filter Pills */}
-        <View className="flex-row gap-2 mb-2">
-          {(["all", "expense", "income"] as const).map((type) => (
-            <Pressable
-              key={type}
-              onPress={() => setFilterType(type)}
-              className={`px-4 py-2 rounded-full ${
-                filterType === type
-                  ? "bg-primary"
-                  : "bg-surface dark:bg-surface-dark"
-              }`}
-            >
-              <Text
-                className={`text-sm font-medium capitalize ${
-                  filterType === type
-                    ? "text-white"
-                    : "text-text-primary dark:text-text-primary-dark"
-                }`}
-              >
-                {type === "all" ? "All" : type}
-              </Text>
-            </Pressable>
-          ))}
-
-          {/* More Filters Button */}
+      {/* Header with tabs */}
+      <View style={{ paddingTop: insets.top + 8 }} className="px-4 pb-2 bg-background dark:bg-background-dark">
+        {/* Main Tab Switcher */}
+        <View className="flex-row mb-3 p-1 bg-surface dark:bg-surface-dark rounded-bento">
           <Pressable
-            onPress={() => setShowFilterModal(true)}
-            className={`px-4 py-2 rounded-full flex-row items-center ${
-              filterCategoryId || filterDatePreset !== "all"
-                ? "bg-primary"
-                : "bg-surface dark:bg-surface-dark"
-            }`}
+            onPress={() => setActiveTab("transactions")}
+            className={`flex-1 py-2.5 rounded-bento-sm items-center ${activeTab === "transactions" ? "bg-primary" : ""}`}
           >
-            <Ionicons
-              name="filter"
-              size={14}
-              color={
-                filterCategoryId || filterDatePreset !== "all"
-                  ? "#FFFFFF"
-                  : colors.textSecondary
-              }
-            />
-            <Text
-              className={`text-sm font-medium ml-1 ${
-                filterCategoryId || filterDatePreset !== "all"
-                  ? "text-white"
-                  : "text-text-primary dark:text-text-primary-dark"
-              }`}
-            >
-              Filters
+            <Text className={`font-semibold text-sm ${activeTab === "transactions" ? "text-white" : "text-text-secondary dark:text-text-secondary-dark"}`}>
+              Transactions
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setActiveTab("credit_cards")}
+            className={`flex-1 py-2.5 rounded-bento-sm items-center ${activeTab === "credit_cards" ? "bg-primary" : ""}`}
+          >
+            <Text className={`font-semibold text-sm ${activeTab === "credit_cards" ? "text-white" : "text-text-secondary dark:text-text-secondary-dark"}`}>
+              Credit Cards
             </Text>
           </Pressable>
         </View>
-
-        {/* Active filter tags */}
-        {hasActiveFilters && (
-          <View className="flex-row items-center gap-2">
-            {selectedCategoryName && (
-              <View className="flex-row items-center bg-primary/15 rounded-full px-3 py-1">
-                <Text className="text-primary text-xs font-medium">
-                  {selectedCategoryName}
-                </Text>
-                <Pressable
-                  onPress={() => setFilterCategoryId(null)}
-                  className="ml-1"
-                >
-                  <Ionicons name="close-circle" size={14} color={colors.tint} />
-                </Pressable>
-              </View>
-            )}
-            {filterDatePreset !== "all" && (
-              <View className="flex-row items-center bg-primary/15 rounded-full px-3 py-1">
-                <Text className="text-primary text-xs font-medium">
-                  {filterDatePreset === "custom"
-                    ? `${filterStartDate || "..."} → ${filterEndDate || "..."}`
-                    : DATE_PRESETS.find((p) => p.value === filterDatePreset)
-                        ?.label}
-                </Text>
-                <Pressable
-                  onPress={() => {
-                    setFilterDatePreset("all");
-                    setFilterStartDate("");
-                    setFilterEndDate("");
-                  }}
-                  className="ml-1"
-                >
-                  <Ionicons name="close-circle" size={14} color={colors.tint} />
-                </Pressable>
-              </View>
-            )}
-            <Pressable onPress={clearFilters}>
-              <Text className="text-text-muted dark:text-text-muted-dark text-xs">
-                Clear all
-              </Text>
-            </Pressable>
-          </View>
-        )}
       </View>
 
-      <FlatList
-        data={listData}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.tint}
-          />
-        }
-        contentContainerStyle={
-          listData.length === 0
-            ? { flexGrow: 1, paddingBottom: 100 }
-            : { paddingBottom: 100 }
-        }
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          hasActiveFilters ? (
-            <View className="flex-1 items-center justify-center px-8">
-              <Ionicons
-                name="search-outline"
-                size={40}
-                color={colors.textMuted}
-              />
-              <Text className="text-text-primary dark:text-text-primary-dark text-lg font-semibold mt-3 mb-1">
-                No results
-              </Text>
-              <Text className="text-text-muted dark:text-text-muted-dark text-center mb-4">
-                No transactions match your current filters
-              </Text>
+      {/* Transactions Tab */}
+      {activeTab === "transactions" && (
+        <>
+          {/* Filter Bar */}
+          <View className="px-4 pb-2 bg-background dark:bg-background-dark">
+            {/* Type Filter Pills */}
+            <View className="flex-row gap-2 mb-2">
+              {(["all", "expense", "income"] as const).map((type) => (
+                <Pressable
+                  key={type}
+                  onPress={() => setFilterType(type)}
+                  className={`px-4 py-2 rounded-full ${
+                    filterType === type
+                      ? "bg-primary"
+                      : "bg-surface dark:bg-surface-dark"
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-medium capitalize ${
+                      filterType === type
+                        ? "text-white"
+                        : "text-text-primary dark:text-text-primary-dark"
+                    }`}
+                  >
+                    {type === "all" ? "All" : type}
+                  </Text>
+                </Pressable>
+              ))}
+
+              {/* More Filters Button */}
               <Pressable
-                onPress={clearFilters}
-                className="bg-primary px-5 py-2.5 rounded-full"
+                onPress={() => setShowFilterModal(true)}
+                className={`px-4 py-2 rounded-full flex-row items-center ${
+                  filterCategoryId || filterDatePreset !== "all"
+                    ? "bg-primary"
+                    : "bg-surface dark:bg-surface-dark"
+                }`}
               >
-                <Text className="text-white font-medium text-sm">
-                  Clear Filters
+                <Ionicons
+                  name="filter"
+                  size={14}
+                  color={
+                    filterCategoryId || filterDatePreset !== "all"
+                      ? "#FFFFFF"
+                      : colors.textSecondary
+                  }
+                />
+                <Text
+                  className={`text-sm font-medium ml-1 ${
+                    filterCategoryId || filterDatePreset !== "all"
+                      ? "text-white"
+                      : "text-text-primary dark:text-text-primary-dark"
+                  }`}
+                >
+                  Filters
                 </Text>
               </Pressable>
             </View>
-          ) : undefined
-        }
-      />
 
-      {/* Filter Modal */}
+            {/* Active filter tags */}
+            {hasActiveFilters && (
+              <View className="flex-row items-center gap-2">
+                {selectedCategoryName && (
+                  <View className="flex-row items-center bg-primary/15 rounded-full px-3 py-1">
+                    <Text className="text-primary text-xs font-medium">
+                      {selectedCategoryName}
+                    </Text>
+                    <Pressable
+                      onPress={() => setFilterCategoryId(null)}
+                      className="ml-1"
+                    >
+                      <Ionicons name="close-circle" size={14} color={colors.tint} />
+                    </Pressable>
+                  </View>
+                )}
+                {filterDatePreset !== "all" && (
+                  <View className="flex-row items-center bg-primary/15 rounded-full px-3 py-1">
+                    <Text className="text-primary text-xs font-medium">
+                      {filterDatePreset === "custom"
+                        ? `${filterStartDate || "..."} → ${filterEndDate || "..."}`
+                        : DATE_PRESETS.find((p) => p.value === filterDatePreset)
+                            ?.label}
+                    </Text>
+                    <Pressable
+                      onPress={() => {
+                        setFilterDatePreset("all");
+                        setFilterStartDate("");
+                        setFilterEndDate("");
+                      }}
+                      className="ml-1"
+                    >
+                      <Ionicons name="close-circle" size={14} color={colors.tint} />
+                    </Pressable>
+                  </View>
+                )}
+                <Pressable onPress={clearFilters}>
+                  <Text className="text-text-muted dark:text-text-muted-dark text-xs">
+                    Clear all
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+
+          <FlatList
+            data={listData}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.tint}
+              />
+            }
+            contentContainerStyle={
+              listData.length === 0
+                ? { flexGrow: 1, paddingBottom: 100 }
+                : { paddingBottom: 100 }
+            }
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              hasActiveFilters ? (
+                <View className="flex-1 items-center justify-center px-8 py-12">
+                  <Ionicons
+                    name="search-outline"
+                    size={40}
+                    color={colors.textMuted}
+                  />
+                  <Text className="text-text-primary dark:text-text-primary-dark text-lg font-semibold mt-3 mb-1">
+                    No results
+                  </Text>
+                  <Text className="text-text-muted dark:text-text-muted-dark text-center mb-4">
+                    No transactions match your current filters
+                  </Text>
+                  <Pressable
+                    onPress={clearFilters}
+                    className="bg-primary px-5 py-2.5 rounded-full"
+                  >
+                    <Text className="text-white font-medium text-sm">
+                      Clear Filters
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View className="flex-1 items-center justify-center px-8 py-12">
+                  <View className="w-20 h-20 rounded-full bg-surface dark:bg-surface-dark items-center justify-center mb-4">
+                    <Ionicons name="receipt-outline" size={40} color={colors.textMuted} />
+                  </View>
+                  <Text className="text-text-primary dark:text-text-primary-dark text-xl font-semibold mb-2">
+                    No transactions yet
+                  </Text>
+                  <Text className="text-text-muted dark:text-text-muted-dark text-center mb-6">
+                    Start tracking your expenses by adding your first transaction
+                  </Text>
+                  <Pressable
+                    onPress={handleAddPress}
+                    className="bg-primary px-6 py-3 rounded-bento"
+                  >
+                    <Text className="text-white font-semibold">Add Transaction</Text>
+                  </Pressable>
+                </View>
+              )
+            }
+          />
+        </>
+      )}
+
+      {/* Credit Card Cycles Tab */}
+      {activeTab === "credit_cards" && (
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.tint}
+            />
+          }
+        >
+          {ccLoading && ccCycles.length === 0 ? (
+            <View className="items-center justify-center py-12">
+              <ActivityIndicator size="large" color={colors.tint} />
+            </View>
+          ) : ccCycles.length === 0 ? (
+            <View className="items-center justify-center py-12">
+              <View className="w-16 h-16 rounded-full bg-surface dark:bg-surface-dark items-center justify-center mb-3">
+                <Ionicons name="card-outline" size={32} color={colors.textMuted} />
+              </View>
+              <Text className="text-text-primary dark:text-text-primary-dark text-base font-semibold mb-1">
+                No active billing cycles
+              </Text>
+              <Text className="text-text-muted dark:text-text-muted-dark text-sm text-center px-4">
+                Credit card billing cycles will appear here once you have credit card accounts with transactions
+              </Text>
+            </View>
+          ) : (
+            ccCycles.map((cycle) => {
+              const isExpanded = expandedCycleId === cycle.id;
+              const cycleAccount = accounts.find((a) => a.id === cycle.accountId);
+              const txs = ccCycleTransactions[cycle.id] ?? [];
+              const deadlineDate = new Date(cycle.deadlineDate + "T00:00:00");
+              const deadlineDisplay = deadlineDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+              const urgencyColor = cycle.isOverdue ? "#FF6B6B" : cycle.daysUntilDeadline <= 7 ? "#F59E0B" : "#05DF72";
+
+              return (
+                <View key={cycle.id} className="bg-surface dark:bg-surface-dark rounded-bento mb-3 overflow-hidden">
+                  {/* Cycle Header */}
+                  <Pressable
+                    onPress={() => setExpandedCycleId(isExpanded ? null : cycle.id)}
+                    className="p-4"
+                  >
+                    <View className="flex-row items-center justify-between mb-2">
+                      <View className="flex-row items-center gap-2">
+                        <View
+                          className="w-8 h-8 rounded-full items-center justify-center"
+                          style={{ backgroundColor: (cycleAccount?.color ?? "#888") + "20" }}
+                        >
+                          <Ionicons name="card" size={16} color={cycleAccount?.color ?? "#888"} />
+                        </View>
+                        <View>
+                          <Text className="text-text-primary dark:text-text-primary-dark font-semibold text-base">
+                            {cycle.accountName}
+                          </Text>
+                          <Text className="text-text-muted dark:text-text-muted-dark text-xs">
+                            {cycle.billingStartDate} – {cycle.billingEndDate}
+                          </Text>
+                        </View>
+                      </View>
+                      <Ionicons
+                        name={isExpanded ? "chevron-up" : "chevron-down"}
+                        size={18}
+                        color={colors.textMuted}
+                      />
+                    </View>
+
+                    {/* Due date + status */}
+                    <View className="flex-row items-center justify-between mt-1">
+                      <View className="flex-row items-center gap-1">
+                        <Ionicons name="calendar-outline" size={14} color={urgencyColor} />
+                        <Text style={{ color: urgencyColor }} className="text-sm font-medium">
+                          Due {deadlineDisplay}
+                        </Text>
+                        {cycle.isOverdue && (
+                          <View className="bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded ml-1">
+                            <Text className="text-red-600 dark:text-red-400 text-xs font-medium">Overdue</Text>
+                          </View>
+                        )}
+                        {!cycle.isOverdue && cycle.daysUntilDeadline <= 7 && (
+                          <View className="bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded ml-1">
+                            <Text className="text-amber-600 dark:text-amber-400 text-xs font-medium">{cycle.daysUntilDeadline}d left</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text className="text-text-primary dark:text-text-primary-dark font-bold text-base">
+                        {formatCurrency(cycle.remainingAmount, cycleAccount?.currency ?? "php")}
+                      </Text>
+                    </View>
+
+                    {/* Amount breakdown */}
+                    <View className="flex-row mt-2 gap-4">
+                      <View>
+                        <Text className="text-text-muted dark:text-text-muted-dark text-xs">Spent</Text>
+                        <Text className="text-text-secondary dark:text-text-secondary-dark text-sm font-medium">
+                          {formatCurrency(cycle.transactionAmount, cycleAccount?.currency ?? "php")}
+                        </Text>
+                      </View>
+                      {cycle.carryoverAmount > 0 && (
+                        <View>
+                          <Text className="text-text-muted dark:text-text-muted-dark text-xs">Carried over</Text>
+                          <Text className="text-text-secondary dark:text-text-secondary-dark text-sm font-medium">
+                            {formatCurrency(cycle.carryoverAmount, cycleAccount?.currency ?? "php")}
+                          </Text>
+                        </View>
+                      )}
+                      <View>
+                        <Text className="text-text-muted dark:text-text-muted-dark text-xs">Paid</Text>
+                        <Text style={{ color: "#05DF72" }} className="text-sm font-medium">
+                          {formatCurrency(cycle.paidAmount, cycleAccount?.currency ?? "php")}
+                        </Text>
+                      </View>
+                      <View>
+                        <Text className="text-text-muted dark:text-text-muted-dark text-xs">Remaining</Text>
+                        <Text style={{ color: "#FF6B6B" }} className="text-sm font-medium">
+                          {formatCurrency(cycle.remainingAmount, cycleAccount?.currency ?? "php")}
+                        </Text>
+                      </View>
+                    </View>
+                  </Pressable>
+
+                  {/* Expanded: transaction list */}
+                  {isExpanded && (
+                    <View className="border-t border-surface-hover dark:border-surface-hover-dark">
+                      {txs.length === 0 ? (
+                        <Text className="text-text-muted dark:text-text-muted-dark text-sm text-center py-4">
+                          No transactions in this period
+                        </Text>
+                      ) : (
+                        txs.map((tx) => {
+                          const cat = categoryMap.get(tx.categoryId ?? "");
+                          const txDate = new Date(tx.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                          return (
+                            <View key={tx.id} className="flex-row items-center px-4 py-2.5 border-b border-surface-hover dark:border-surface-hover-dark">
+                              <View
+                                className="w-7 h-7 rounded-full items-center justify-center mr-3"
+                                style={{ backgroundColor: (cat?.color ?? "#888") + "20" }}
+                              >
+                                <Ionicons name={(cat?.icon ?? "wallet") as any} size={14} color={cat?.color ?? "#888"} />
+                              </View>
+                              <View className="flex-1">
+                                <Text className="text-text-primary dark:text-text-primary-dark text-sm font-medium" numberOfLines={1}>
+                                  {tx.description || cat?.name || "Expense"}
+                                </Text>
+                                <Text className="text-text-muted dark:text-text-muted-dark text-xs">{txDate}</Text>
+                              </View>
+                              <Text style={{ color: "#FF6B6B" }} className="text-sm font-semibold">
+                                -{formatCurrency(tx.amount, cycleAccount?.currency ?? "php")}
+                              </Text>
+                            </View>
+                          );
+                        })
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+      )}
+
       <Modal
         visible={showFilterModal}
         animationType="slide"

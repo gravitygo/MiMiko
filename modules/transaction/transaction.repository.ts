@@ -7,8 +7,8 @@ export function createTransactionRepository() {
     async insert(transaction: Transaction): Promise<void> {
       const db = await getDatabase();
       await db.runAsync(
-        `INSERT INTO transactions (id, type, amount, description, category_id, account_id, to_account_id, to_amount, fee, exchange_rate, date, recurring_rule_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO transactions (id, type, amount, description, category_id, account_id, to_account_id, to_amount, fee, exchange_rate, date, recurring_rule_id, is_ghost, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           transaction.id,
           transaction.type,
@@ -22,6 +22,7 @@ export function createTransactionRepository() {
           transaction.exchangeRate,
           transaction.date,
           transaction.recurringRuleId,
+          transaction.isGhost ? 1 : 0,
           transaction.createdAt,
           transaction.updatedAt,
         ]
@@ -31,7 +32,7 @@ export function createTransactionRepository() {
     async update(transaction: Transaction): Promise<void> {
       const db = await getDatabase();
       await db.runAsync(
-        `UPDATE transactions SET type = ?, amount = ?, description = ?, category_id = ?, account_id = ?, to_account_id = ?, to_amount = ?, fee = ?, exchange_rate = ?, date = ?, updated_at = ? WHERE id = ?`,
+        `UPDATE transactions SET type = ?, amount = ?, description = ?, category_id = ?, account_id = ?, to_account_id = ?, to_amount = ?, fee = ?, exchange_rate = ?, date = ?, is_ghost = ?, updated_at = ? WHERE id = ?`,
         [
           transaction.type,
           transaction.amount,
@@ -43,6 +44,7 @@ export function createTransactionRepository() {
           transaction.fee,
           transaction.exchangeRate,
           transaction.date,
+          transaction.isGhost ? 1 : 0,
           transaction.updatedAt,
           transaction.id,
         ]
@@ -85,6 +87,11 @@ export function createTransactionRepository() {
       if (filter.endDate) {
         conditions.push('date <= ?');
         params.push(filter.endDate);
+      }
+      if (filter.isGhost === true) {
+        conditions.push('is_ghost = 1');
+      } else if (filter.isGhost === false) {
+        conditions.push('is_ghost = 0');
       }
 
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -164,6 +171,11 @@ export function createTransactionRepository() {
       if (filter.endDate) {
         conditions.push('date <= ?');
         params.push(filter.endDate);
+      }
+      if (filter.isGhost === true) {
+        conditions.push('is_ghost = 1');
+      } else if (filter.isGhost === false) {
+        conditions.push('is_ghost = 0');
       }
 
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

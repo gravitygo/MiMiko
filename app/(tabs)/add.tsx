@@ -265,7 +265,13 @@ export default function AddTransactionScreen() {
       description: description.trim() || undefined,
       categoryId: selectedCategoryId,
       accountId: selectedAccountId,
-      date: new Date().toISOString(),
+      date: (() => {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      })(),
     });
 
     if (transaction && isRecurring) {

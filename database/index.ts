@@ -178,6 +178,14 @@ export async function initializeDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_cc_cycles_closed ON credit_card_cycles(is_closed);
   `);
 
+  // Migration: add is_ghost column to transactions (ghost transactions are visible
+  // in history but do not affect account balances — used for credit card expenses)
+  try {
+    await database.execAsync('ALTER TABLE transactions ADD COLUMN is_ghost INTEGER NOT NULL DEFAULT 0');
+  } catch {
+    // Column already exists
+  }
+
   await seedDefaultData(database);
 }
 

@@ -14,6 +14,8 @@ export interface Transaction {
   exchangeRate: number | null; // Rate used for currency conversion
   date: string;
   recurringRuleId: string | null;
+  /** Ghost transactions are visible in history but do not affect account balances */
+  isGhost: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +33,7 @@ export interface TransactionRow {
   exchange_rate: number | null;
   date: string;
   recurring_rule_id: string | null;
+  is_ghost: number;
   created_at: string;
   updated_at: string;
 }
@@ -47,6 +50,8 @@ export interface CreateTransactionInput {
   exchangeRate?: number;
   date: string;
   recurringRuleId?: string;
+  /** When true, transaction is informational only and does not affect account balances */
+  isGhost?: boolean;
 }
 
 export interface UpdateTransactionInput {
@@ -70,5 +75,7 @@ export interface TransactionFilter {
   endDate?: string;
   limit?: number;
   offset?: number;
+  /** When true, include only ghost transactions; when false, exclude ghost transactions; when undefined, include all */
+  isGhost?: boolean;
 }
 
