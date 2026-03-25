@@ -14,6 +14,7 @@ export function mapRowToTransaction(row: TransactionRow): Transaction {
     exchangeRate: row.exchange_rate,
     date: row.date,
     recurringRuleId: row.recurring_rule_id,
+    isGhost: row.is_ghost === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -33,6 +34,7 @@ export function mapTransactionToRow(transaction: Transaction): TransactionRow {
     exchange_rate: transaction.exchangeRate,
     date: transaction.date,
     recurring_rule_id: transaction.recurringRuleId,
+    is_ghost: transaction.isGhost ? 1 : 0,
     created_at: transaction.createdAt,
     updated_at: transaction.updatedAt,
   };

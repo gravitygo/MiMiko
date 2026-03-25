@@ -21,12 +21,15 @@ export function createTransactionService() {
     const account = await accountService.getById(accountId);
     const isCreditMode = account?.creditMode === true || account?.type === 'credit_card';
 
-    // For credit-mode accounts: expenses increase the outstanding balance (amount owed),
-    // income decreases it (paying down the balance).
+    // For credit-mode accounts, expenses are tracked via billing cycles only.
+    // Ghost transactions (credit card expenses) do not affect the account balance.
+    if (isCreditMode && type === 'expense') return;
+
+    // For credit-mode accounts: income decreases the outstanding balance (paying down the balance).
     // For regular accounts: expenses decrease balance, income increases it.
     let adjustment: number;
     if (isCreditMode) {
-      adjustment = type === 'expense' ? amount : -amount;
+      adjustment = -amount; // Income reduces the owed balance
     } else {
       adjustment = type === 'expense' ? -amount : amount;
     }
@@ -64,15 +67,27 @@ export function createTransactionService() {
 
   return {
     async add(input: CreateTransactionInput): Promise<Transaction> {
-      const transaction = createTransaction(input);
+      // For credit-mode accounts, expense transactions are tracked via billing cycles
+      // and should not directly affect the account balance (ghost transactions).
+      // Only auto-set when the caller has not explicitly provided an isGhost value.
+      let effectiveInput = input;
+      if (input.type === 'expense' && input.isGhost === undefined) {
+        const account = await accountService.getById(input.accountId);
+        const isCreditMode = account?.creditMode === true || account?.type === 'credit_card';
+        if (isCreditMode) {
+          effectiveInput = { ...input, isGhost: true };
+        }
+      }
+
+      const transaction = createTransaction(effectiveInput);
       await repository.insert(transaction);
 
-      if (input.type === 'transfer' && input.toAccountId) {
-        const fee = input.fee ?? 0;
-        const toAmount = input.toAmount ?? null;
-        await adjustTransferBalances(input.accountId, input.toAccountId, input.amount, toAmount, fee);
-      } else if (input.type !== 'transfer') {
-        await adjustAccountBalance(input.accountId, input.amount, input.type);
+      if (effectiveInput.type === 'transfer' && effectiveInput.toAccountId) {
+        const fee = effectiveInput.fee ?? 0;
+        const toAmount = effectiveInput.toAmount ?? null;
+        await adjustTransferBalances(effectiveInput.accountId, effectiveInput.toAccountId, effectiveInput.amount, toAmount, fee);
+      } else if (effectiveInput.type !== 'transfer') {
+        await adjustAccountBalance(effectiveInput.accountId, effectiveInput.amount, effectiveInput.type);
       }
 
       return transaction;

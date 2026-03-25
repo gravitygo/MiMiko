@@ -44,7 +44,10 @@ function getDeadlineDate(billingEndDate: Date, billingDay: number, deadlineDay: 
 }
 
 function toDateString(date: Date): string {
-  return date.toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // ─── Live transaction sum for a billing period ───────────────────────────────
@@ -62,6 +65,23 @@ async function fetchTransactionAmount(
     [accountId, startDate, endDate]
   );
   return result?.amount ?? 0;
+}
+
+// ─── Fetch individual transactions for a billing period ──────────────────────
+
+async function fetchTransactionsForPeriod(
+  accountId: string,
+  startDate: string,
+  endDate: string
+): Promise<{ id: string; amount: number; description: string | null; date: string; categoryId: string | null }[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<{ id: string; amount: number; description: string | null; date: string; categoryId: string | null }>(
+    `SELECT id, amount, description, date, category_id AS categoryId
+     FROM transactions
+     WHERE account_id = ? AND type = 'expense' AND date >= ? AND date <= ?
+     ORDER BY date DESC`,
+    [accountId, startDate, endDate]
+  );
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────────
@@ -229,6 +249,15 @@ export function createCreditCardCycleService() {
       }
 
       return applied;
+    },
+
+    /**
+     * Retrieve the expense transactions that fall within a billing cycle's date range.
+     */
+    async getTransactionsForCycle(
+      cycle: CreditCardCycle
+    ): Promise<{ id: string; amount: number; description: string | null; date: string; categoryId: string | null }[]> {
+      return fetchTransactionsForPeriod(cycle.accountId, cycle.billingStartDate, cycle.billingEndDate);
     },
   };
 }
