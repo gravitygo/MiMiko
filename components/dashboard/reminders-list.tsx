@@ -65,15 +65,15 @@ function renderLeftAction(
   type: ReminderType,
   direction?: 'payable' | 'receivable'
 ) {
-  if (type === 'credit_card') return null;
-
   const scale = dragX.interpolate({
     inputRange: [0, 80],
     outputRange: [0.5, 1],
     extrapolate: 'clamp',
   });
 
-  const label = type === 'debt'
+  const label = type === 'credit_card'
+    ? 'Pay'
+    : type === 'debt'
     ? direction === 'receivable' ? 'Received' : 'Paid'
     : 'Paid';
   const color = '#05DF72';
@@ -103,7 +103,6 @@ export function ReminderCard({ item, onConfirm, onRevert, onSkip, onPress }: Rem
   };
 
   const handleSwipeRight = () => {
-    if (item.type === 'credit_card') return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onConfirm(item.id, item.type);
     swipeableRef.current?.close();
@@ -129,9 +128,7 @@ export function ReminderCard({ item, onConfirm, onRevert, onSkip, onPress }: Rem
           : undefined
       }
       renderLeftActions={
-        isCreditCard
-          ? undefined
-          : (progress, dragX) => renderLeftAction(progress, dragX, item.type, item.direction)
+        (progress, dragX) => renderLeftAction(progress, dragX, item.type, item.direction)
       }
       onSwipeableOpen={(direction) => {
         if (direction === 'left') handleSwipeRight();

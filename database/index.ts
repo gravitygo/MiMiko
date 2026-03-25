@@ -158,6 +158,26 @@ export async function initializeDatabase(): Promise<void> {
     // Column already exists
   }
 
+  // Migration: create credit_card_cycles table
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS credit_card_cycles (
+      id TEXT PRIMARY KEY NOT NULL,
+      account_id TEXT NOT NULL,
+      billing_start_date TEXT NOT NULL,
+      billing_end_date TEXT NOT NULL,
+      deadline_date TEXT NOT NULL,
+      carryover_amount REAL NOT NULL DEFAULT 0,
+      paid_amount REAL NOT NULL DEFAULT 0,
+      is_closed INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (account_id) REFERENCES accounts(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_cc_cycles_account ON credit_card_cycles(account_id);
+    CREATE INDEX IF NOT EXISTS idx_cc_cycles_billing_end ON credit_card_cycles(billing_end_date);
+    CREATE INDEX IF NOT EXISTS idx_cc_cycles_closed ON credit_card_cycles(is_closed);
+  `);
+
   await seedDefaultData(database);
 }
 

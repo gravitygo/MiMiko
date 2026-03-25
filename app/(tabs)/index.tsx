@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { ReminderItem, ReminderType } from '@/components/dashboard';
@@ -11,14 +11,17 @@ import {
     RecentTransactionItem,
     RemindersList,
 } from '@/components/dashboard';
+import { Colors } from '@/constants/theme';
 import { useAccounts } from '@/hooks/use-accounts';
 import { useBudgets } from '@/hooks/use-budgets';
 import { useCategories } from '@/hooks/use-categories';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTotalBalance } from '@/hooks/use-currency';
 import { useDebts } from '@/hooks/use-debts';
 import { useRecurring } from '@/hooks/use-recurring';
 import { useTransactions } from '@/hooks/use-transactions';
-import { createCreditCardService, type CreditCardReminder } from '@/modules/account/credit-card.service';
+import { createCreditCardCycleService } from '@/modules/account/credit-card-cycle.service';
+import type { CreditCardCycleWithTotal } from '@/modules/account/credit-card-cycle.types';
 import { createDebtRepository } from '@/modules/debt/debt.repository';
 import { calculateNextDate } from '@/modules/recurring/recurring.model';
 import { createRecurringService } from '@/modules/recurring/recurring.service';
@@ -28,7 +31,7 @@ import { useBudgetStore } from '@/state/budget.store';
 import { useCategoryStore } from '@/state/category.store';
 import { useDebtStore } from '@/state/debt.store';
 import { useRecurringStore } from '@/state/recurring.store';
-import { formatCurrency } from '@/state/settings.store';
+import { formatCurrency, getCurrencySymbol } from '@/state/settings.store';
 import { useTransactionStore } from '@/state/transaction.store';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -57,9 +60,24 @@ export default function HomeScreen() {
   const [recurringUndoStack, setRecurringUndoStack] = useState<Map<string, UndoAction[]>>(new Map());
   // Debts: single undo with time limit
   const [debtUndoMap, setDebtUndoMap] = useState<Map<string, UndoAction>>(new Map());
-  const [ccReminders, setCcReminders] = useState<CreditCardReminder[]>([]);
+  const [ccCycles, setCcCycles] = useState<CreditCardCycleWithTotal[]>([]);
+
+  // Credit card payment modal state
+  const [ccPaymentModal, setCcPaymentModal] = useState<{
+    cycleId: string;
+    accountId: string;
+    accountName: string;
+    totalAmount: number;
+    remainingAmount: number;
+  } | null>(null);
+  const [ccPaymentAmount, setCcPaymentAmount] = useState('');
+  const [ccPayFromAccountId, setCcPayFromAccountId] = useState<string | null>(null);
+  const [ccPaymentSubmitting, setCcPaymentSubmitting] = useState(false);
+
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
 
   const { fetch: fetchTransactions } = useTransactions();
   const { fetch: fetchCategories } = useCategories();
@@ -166,7 +184,7 @@ export default function HomeScreen() {
       });
   }, [transactions, categories]);
 
-  // Ghost allocated: unpaid payables you owe + next recurring expense amounts
+  // Ghost allocated: unpaid payables you owe + next recurring expense amounts + credit card cycle remaining balances
   const committed = useMemo(() => {
     const payableTotal = debts
       .filter((d) => !d.isSettled && d.direction === 'payable')
@@ -176,8 +194,11 @@ export default function HomeScreen() {
       .filter((r) => r.isActive && r.type === 'expense')
       .reduce((sum, r) => sum + r.amount, 0);
 
-    return payableTotal + recurringTotal;
-  }, [debts, recurringRules]);
+    // Credit card cycle remaining balances represent committed (unpaid) debt
+    const creditCardTotal = ccCycles.reduce((sum, c) => sum + c.remainingAmount, 0);
+
+    return payableTotal + recurringTotal + creditCardTotal;
+  }, [debts, recurringRules, ccCycles]);
 
   // Build reminder items from recurring rules + unsettled debts + credit card billing
   const reminderItems = useMemo<ReminderItem[]>(() => {
@@ -234,27 +255,30 @@ export default function HomeScreen() {
       });
     }
 
-    // Credit card billing reminders
-    for (const cc of ccReminders) {
-      const dueLabel = cc.isOverdue
+    // Credit card billing cycle reminders — one row per active billing cycle
+    for (const cycle of ccCycles) {
+      const dueLabel = cycle.isOverdue
         ? 'Overdue'
-        : cc.daysUntilDeadline === 0
+        : cycle.daysUntilDeadline === 0
         ? 'Due today'
-        : `Due ${cc.deadlineDate}`;
+        : `Due ${cycle.deadlineDate}`;
 
-      const billingEndFormatted = new Date(cc.billingDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const billingEndFormatted = new Date(cycle.billingEndDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const carryoverNote = cycle.carryoverAmount > 0
+        ? ` · +${formatCurrency(cycle.carryoverAmount)} carried over`
+        : '';
 
       items.push({
-        id: cc.accountId,
+        id: cycle.id,
         type: 'credit_card',
-        title: cc.accountName,
-        subtitle: `Credit · cycle ends ${billingEndFormatted}`,
-        amount: cc.amount,
+        title: cycle.accountName,
+        subtitle: `Cycle ends ${billingEndFormatted}${carryoverNote}`,
+        amount: cycle.remainingAmount,
         icon: 'card' as IconName,
         iconColor: '#0084D1',
-        dueDate: cc.deadlineDate,
+        dueDate: cycle.deadlineDate,
         dueLabel,
-        isOverdue: cc.isOverdue,
+        isOverdue: cycle.isOverdue,
         direction: 'payable',
       });
     }
@@ -267,7 +291,7 @@ export default function HomeScreen() {
       const dateB = b.dueDate ?? '9999-12-31';
       return dateA.localeCompare(dateB);
     });
-  }, [recurringRules, debts, ccReminders, categories, recurringUndoStack, debtUndoMap]);
+  }, [recurringRules, debts, ccCycles, categories, recurringUndoStack, debtUndoMap]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -288,9 +312,9 @@ export default function HomeScreen() {
       fetchRecurring(),
       fetchDebts(),
     ]);
-    const ccService = createCreditCardService();
-    const reminders = await ccService.getCreditCardReminders();
-    setCcReminders(reminders);
+    const cycleService = createCreditCardCycleService();
+    const cycles = await cycleService.getActiveCycles();
+    setCcCycles(cycles);
   }, [fetchAccounts, fetchTransactions, fetchCategories, fetchBudgetStatuses, fetchRecurring, fetchDebts]);
 
   useFocusEffect(
@@ -381,8 +405,28 @@ export default function HomeScreen() {
       });
 
       await loadData();
+    } else if (type === 'credit_card') {
+      // Show the payment modal — do NOT process immediately
+      // id here is the cycle ID
+      const cycle = ccCycles.find((c) => c.id === id);
+      if (!cycle) return;
+
+      // Default paying-from account: first non-credit account
+      const defaultFrom = accounts.find(
+        (a) => a.id !== cycle.accountId && !a.creditMode && a.type !== 'credit_card'
+      );
+
+      setCcPaymentModal({
+        cycleId: cycle.id,
+        accountId: cycle.accountId,
+        accountName: cycle.accountName,
+        totalAmount: cycle.totalAmount,
+        remainingAmount: cycle.remainingAmount,
+      });
+      setCcPaymentAmount(String(cycle.remainingAmount));
+      setCcPayFromAccountId(defaultFrom?.id ?? null);
     }
-  }, [recurringRules, debts, loadData]);
+  }, [recurringRules, debts, accounts, ccCycles, loadData]);
 
   const handleReminderRevert = useCallback(async (id: string, type: ReminderType) => {
     if (type === 'recurring') {
@@ -464,6 +508,55 @@ export default function HomeScreen() {
     }
   }, [recurringRules, loadData]);
 
+  const handleCreditCardPayment = useCallback(async () => {
+    if (!ccPaymentModal || !ccPayFromAccountId) return;
+    const amount = parseFloat(ccPaymentAmount);
+    if (isNaN(amount) || amount <= 0) return;
+
+    setCcPaymentSubmitting(true);
+    try {
+      const transactionService = createTransactionService();
+      const cycleService = createCreditCardCycleService();
+
+      // Clamp to the remaining balance
+      const applied = Math.min(amount, ccPaymentModal.remainingAmount);
+
+      // Record the expense from the paying account (cash going out)
+      await transactionService.add({
+        type: 'expense',
+        amount: applied,
+        description: `Credit card payment: ${ccPaymentModal.accountName}`,
+        categoryId: 'cat_transfers',
+        accountId: ccPayFromAccountId,
+        date: new Date().toISOString(),
+      });
+
+      // Record income on the credit card account (reduces outstanding balance/debt)
+      await transactionService.add({
+        type: 'income',
+        amount: applied,
+        description: `Credit card payment received: ${ccPaymentModal.accountName}`,
+        categoryId: 'cat_transfers',
+        accountId: ccPaymentModal.accountId,
+        date: new Date().toISOString(),
+      });
+
+      // Update the cycle's paid amount (auto-closes if fully paid)
+      await cycleService.recordPayment(
+        ccPaymentModal.cycleId,
+        applied,
+        ccPaymentModal.remainingAmount
+      );
+
+      setCcPaymentModal(null);
+      setCcPaymentAmount('');
+      setCcPayFromAccountId(null);
+      await loadData();
+    } finally {
+      setCcPaymentSubmitting(false);
+    }
+  }, [ccPaymentModal, ccPayFromAccountId, ccPaymentAmount, loadData]);
+
   const handleReminderPress = useCallback((id: string, type: ReminderType) => {
     if (type === 'recurring') {
       router.push({ pathname: '/recurring', params: { editId: id } });
@@ -472,9 +565,16 @@ export default function HomeScreen() {
     }
   }, [router]);
 
+  // Accounts available to pay from (non-credit)
+  const payableFromAccounts = useMemo(
+    () => accounts.filter((a) => !a.creditMode && a.type !== 'credit_card'),
+    [accounts]
+  );
+
   return (
+    <View className="flex-1 bg-background dark:bg-background-dark">
     <ScrollView
-      className="flex-1 bg-background dark:bg-background-dark"
+      className="flex-1"
       contentContainerStyle={{
         paddingHorizontal: 16,
         paddingTop: insets.top + 8,
@@ -725,6 +825,176 @@ export default function HomeScreen() {
         )}
       </View>
     </ScrollView>
+
+      {/* Credit Card Payment Modal */}
+      <Modal
+        visible={ccPaymentModal !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setCcPaymentModal(null)}
+      >
+        <View className="flex-1 justify-end bg-black/50">
+          <View style={{ backgroundColor: colors.surface }} className="rounded-t-3xl p-6">
+            <View className="flex-row items-center justify-between mb-5">
+              <View>
+                <Text style={{ color: colors.textMuted }} className="text-xs mb-0.5">
+                  Credit Card Payment
+                </Text>
+                <Text style={{ color: colors.text }} className="text-xl font-bold">
+                  {ccPaymentModal?.accountName}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setCcPaymentModal(null)}
+                className="w-8 h-8 rounded-full items-center justify-center"
+                style={{ backgroundColor: colors.surfaceHover }}
+              >
+                <Ionicons name="close" size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            {/* Amount summary */}
+            <View className="flex-row mb-4 gap-2">
+              <View className="flex-1 p-3 rounded-2xl" style={{ backgroundColor: colors.surfaceHover }}>
+                <Text style={{ color: colors.textMuted }} className="text-xs mb-0.5">Total Bill</Text>
+                <Text style={{ color: colors.text }} className="font-semibold text-sm">
+                  {formatCurrency(ccPaymentModal?.totalAmount ?? 0)}
+                </Text>
+              </View>
+              <View className="flex-1 p-3 rounded-2xl" style={{ backgroundColor: '#FF6B6B15' }}>
+                <Text style={{ color: colors.textMuted }} className="text-xs mb-0.5">Remaining</Text>
+                <Text style={{ color: '#FF6B6B' }} className="font-semibold text-sm">
+                  {formatCurrency(ccPaymentModal?.remainingAmount ?? 0)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Payment amount input */}
+            <Text style={{ color: colors.textSecondary }} className="text-sm mb-2">
+              Payment Amount
+            </Text>
+            <View
+              className="flex-row items-center rounded-2xl px-4 mb-1"
+              style={{ backgroundColor: colors.surfaceHover }}
+            >
+              <Text style={{ color: colors.textMuted }} className="text-base mr-1">
+                {getCurrencySymbol()}
+              </Text>
+              <TextInput
+                value={ccPaymentAmount}
+                onChangeText={(t) => {
+                  // Allow only valid decimal numbers (one decimal point)
+                  const cleaned = t.replace(/[^0-9.]/g, '');
+                  const parts = cleaned.split('.');
+                  const sanitized = parts.length > 2
+                    ? parts[0] + '.' + parts.slice(1).join('')
+                    : cleaned;
+                  setCcPaymentAmount(sanitized);
+                }}
+                placeholder="0.00"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="decimal-pad"
+                style={{ color: colors.text, flex: 1, paddingVertical: 12, fontSize: 16 }}
+              />
+            </View>
+            {ccPaymentModal && parseFloat(ccPaymentAmount) > ccPaymentModal.remainingAmount && (
+              <Text style={{ color: '#FFBA00' }} className="text-xs mb-3 ml-1">
+                Amount exceeds remaining balance — will be clamped to {formatCurrency(ccPaymentModal.remainingAmount)}
+              </Text>
+            )}
+            {(!ccPaymentModal || parseFloat(ccPaymentAmount) <= ccPaymentModal.remainingAmount) && (
+              <View className="mb-4" />
+            )}
+
+            {/* Pay from account selector */}
+            <Text style={{ color: colors.textSecondary }} className="text-sm mb-2">
+              Pay From
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mb-5"
+              contentContainerStyle={{ gap: 8 }}
+            >
+              {payableFromAccounts.map((acc) => {
+                const isSelected = acc.id === ccPayFromAccountId;
+                return (
+                  <Pressable
+                    key={acc.id}
+                    onPress={() => setCcPayFromAccountId(acc.id)}
+                    className="flex-row items-center px-3 py-2 rounded-2xl"
+                    style={{
+                      backgroundColor: isSelected ? '#0084D120' : colors.surfaceHover,
+                      borderWidth: isSelected ? 1 : 0,
+                      borderColor: '#0084D1',
+                    }}
+                  >
+                    <View
+                      className="w-7 h-7 rounded-full items-center justify-center mr-2"
+                      style={{ backgroundColor: acc.color + '30' }}
+                    >
+                      <Ionicons name={acc.icon as IconName} size={14} color={acc.color} />
+                    </View>
+                    <View>
+                      <Text
+                        style={{ color: isSelected ? '#0084D1' : colors.text }}
+                        className="text-sm font-medium"
+                        numberOfLines={1}
+                      >
+                        {acc.name}
+                      </Text>
+                      <Text style={{ color: colors.textMuted }} className="text-xs">
+                        {formatCurrency(acc.balance)}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+              {payableFromAccounts.length === 0 && (
+                <Text style={{ color: colors.textMuted }} className="text-sm py-2">
+                  No accounts available
+                </Text>
+              )}
+            </ScrollView>
+
+            <Pressable
+              onPress={handleCreditCardPayment}
+              disabled={
+                ccPaymentSubmitting ||
+                !ccPayFromAccountId ||
+                !ccPaymentAmount ||
+                parseFloat(ccPaymentAmount) <= 0
+              }
+              className="py-4 rounded-2xl items-center"
+              style={{
+                backgroundColor:
+                  ccPayFromAccountId && ccPaymentAmount && parseFloat(ccPaymentAmount) > 0
+                    ? '#0084D1'
+                    : colors.surfaceHover,
+              }}
+            >
+              {ccPaymentSubmitting ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text
+                  className="font-semibold text-base"
+                  style={{
+                    color:
+                      ccPayFromAccountId && ccPaymentAmount && parseFloat(ccPaymentAmount) > 0
+                        ? '#FFFFFF'
+                        : colors.textMuted,
+                  }}
+                >
+                  Confirm Payment
+                </Text>
+              )}
+            </Pressable>
+
+            <View style={{ height: insets.bottom + 8 }} />
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
