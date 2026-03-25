@@ -8,6 +8,7 @@ import {
   TextInput,
   ActivityIndicator,
   ScrollView,
+  Switch,
 } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -63,13 +64,22 @@ function AccountItem({ account, onPress }: AccountItemProps) {
         </Text>
         <Text style={{ color: colors.textSecondary }} className="text-sm">
           {ACCOUNT_TYPES.find((t) => t.type === account.type)?.label}
+          {(account.creditMode || account.type === 'credit_card') ? ' · Credit Mode' : ''}
         </Text>
       </View>
       <View className="items-end">
-        <Text style={{ color: colors.text }} className="text-base font-bold">
+        <Text
+          style={{ color: account.creditMode ? '#FF6B6B' : colors.text }}
+          className="text-base font-bold"
+        >
           {formatCurrency(account.balance, account.currency || 'php')}
         </Text>
         <View className="flex-row items-center mt-0.5">
+          {account.creditMode && (
+            <View className="bg-red-500/10 px-1.5 py-0.5 rounded mr-1">
+              <Text className="text-red-500 text-xs font-medium">Credit</Text>
+            </View>
+          )}
           {account.currency && account.currency !== 'php' && (
             <View className="bg-primary/10 px-1.5 py-0.5 rounded mr-1">
               <Text className="text-primary text-xs font-medium">
@@ -105,6 +115,7 @@ export default function AccountsScreen() {
   const [billingDate, setBillingDate] = useState('');
   const [deadlineDate, setDeadlineDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [creditMode, setCreditMode] = useState(false);
 
   const accounts = useAccountStore((s) => s.accounts);
   const { fetch: fetchAccounts, add, edit, remove } = useAccounts();
@@ -121,6 +132,7 @@ export default function AccountsScreen() {
     setBalance('');
     setBillingDate('');
     setDeadlineDate('');
+    setCreditMode(false);
     setEditingAccount(null);
   }, []);
 
@@ -138,6 +150,7 @@ export default function AccountsScreen() {
     setBalance(account.balance.toString());
     setBillingDate(account.billingDate?.toString() ?? '');
     setDeadlineDate(account.deadlineDate?.toString() ?? '');
+    setCreditMode(account.creditMode === true || account.type === 'credit_card');
     setShowModal(true);
   }, []);
 
@@ -152,10 +165,11 @@ export default function AccountsScreen() {
     setSubmitting(true);
 
     const parsedBalance = parseFloat(balance) || 0;
-    const parsedBillingDate = selectedType === 'credit_card' && billingDate.trim()
+    const isCreditMode = creditMode || selectedType === 'credit_card';
+    const parsedBillingDate = isCreditMode && billingDate.trim()
       ? Math.min(31, Math.max(1, parseInt(billingDate, 10) || 1))
       : undefined;
-    const parsedDeadlineDate = selectedType === 'credit_card' && deadlineDate.trim()
+    const parsedDeadlineDate = isCreditMode && deadlineDate.trim()
       ? Math.min(31, Math.max(1, parseInt(deadlineDate, 10) || 1))
       : undefined;
 
@@ -166,6 +180,7 @@ export default function AccountsScreen() {
         icon: ACCOUNT_TYPES.find((t) => t.type === selectedType)?.icon || 'cash',
         color: selectedColor,
         currency: selectedCurrency,
+        creditMode: isCreditMode,
         billingDate: parsedBillingDate,
         deadlineDate: parsedDeadlineDate,
       });
@@ -177,6 +192,7 @@ export default function AccountsScreen() {
         color: selectedColor,
         currency: selectedCurrency,
         balance: parsedBalance,
+        creditMode: isCreditMode,
         billingDate: parsedBillingDate,
         deadlineDate: parsedDeadlineDate,
       });
@@ -184,7 +200,7 @@ export default function AccountsScreen() {
 
     setSubmitting(false);
     handleClose();
-  }, [name, selectedType, selectedColor, selectedCurrency, balance, billingDate, deadlineDate, editingAccount, add, edit, handleClose]);
+  }, [name, selectedType, selectedColor, selectedCurrency, balance, billingDate, deadlineDate, creditMode, editingAccount, add, edit, handleClose]);
 
   const handleDelete = useCallback(async () => {
     if (!editingAccount) return;
@@ -362,8 +378,28 @@ export default function AccountsScreen() {
               </>
             )}
 
-            {/* Credit Card Fields */}
-            {selectedType === 'credit_card' && (
+            {/* Credit Mode Toggle */}
+            {selectedType !== 'credit_card' && (
+              <View className="flex-row items-center justify-between mb-4">
+                <View className="flex-1 mr-3">
+                  <Text style={{ color: colors.text }} className="text-sm font-medium">
+                    Credit Mode
+                  </Text>
+                  <Text style={{ color: colors.textSecondary }} className="text-xs mt-0.5">
+                    Expenses accumulate as outstanding balance until due date
+                  </Text>
+                </View>
+                <Switch
+                  value={creditMode}
+                  onValueChange={setCreditMode}
+                  trackColor={{ false: colors.surfaceHover, true: colors.tint + '80' }}
+                  thumbColor={creditMode ? colors.tint : colors.textMuted}
+                />
+              </View>
+            )}
+
+            {/* Credit / Credit Card Fields */}
+            {(creditMode || selectedType === 'credit_card') && (
               <>
                 <Text style={{ color: colors.textSecondary }} className="text-sm mb-2">
                   Billing Day of Month

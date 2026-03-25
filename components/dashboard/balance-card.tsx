@@ -16,6 +16,7 @@ interface AccountBreakdown {
   color: string;
   type: string;
   currency?: string;
+  creditMode?: boolean;
 }
 
 interface BalanceCardProps {
@@ -49,6 +50,12 @@ function MiniSparkline({ data }: { data: number[] }) {
       })}
     </View>
   );
+}
+
+function getBalanceTextColor(acc: AccountBreakdown): string {
+  const isCreditAccount = acc.creditMode || acc.type === 'credit_card';
+  if (isCreditAccount && acc.balance > 0) return 'text-expense';
+  return acc.balance >= 0 ? 'text-secondary' : 'text-expense';
 }
 
 export function BalanceCard({ totalBalance, income, expense, committed, sparklineData = [], accounts = [] }: BalanceCardProps) {
@@ -115,11 +122,12 @@ export function BalanceCard({ totalBalance, income, expense, committed, sparklin
                       </Text>
                     </View>
                   )}
-                  <Text
-                    className={`text-sm font-semibold ${
-                      acc.balance >= 0 ? 'text-secondary' : 'text-expense'
-                    }`}
-                  >
+                  {(acc.creditMode || acc.type === 'credit_card') && acc.balance > 0 && (
+                    <View className="bg-expense/10 px-1 py-0.5 rounded mr-1.5">
+                      <Text className="text-expense text-[10px] font-medium">Owed</Text>
+                    </View>
+                  )}
+                  <Text className={`text-sm font-semibold ${getBalanceTextColor(acc)}`}>
                     {formatWithCurrency(acc.balance, acc.currency || 'php')}
                   </Text>
                 </View>

@@ -109,6 +109,15 @@ export async function initializeDatabase(): Promise<void> {
     // Column already exists
   }
 
+  // Migration: add credit_mode column to accounts
+  try {
+    await database.execAsync('ALTER TABLE accounts ADD COLUMN credit_mode INTEGER DEFAULT 0');
+    // Auto-enable credit_mode for existing credit_card accounts
+    await database.execAsync("UPDATE accounts SET credit_mode = 1 WHERE type = 'credit_card'");
+  } catch {
+    // Column already exists
+  }
+
   // Migration: create exchange_rates table
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS exchange_rates (

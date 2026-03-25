@@ -71,7 +71,7 @@ function formatDateString(date: Date): string {
 export function createCreditCardService() {
   return {
     async getBillingInfo(account: Account): Promise<CreditCardBillingInfo | null> {
-      if (account.type !== 'credit_card') return null;
+      if (!account.creditMode && account.type !== 'credit_card') return null;
       if (!account.billingDate || !account.deadlineDate) return null;
 
       const { startDate, endDate } = getBillingCycleDates(account.billingDate);
@@ -191,7 +191,7 @@ export function createCreditCardService() {
 
       const rows = await db.getAllAsync<AccountRow>(
         `SELECT * FROM accounts
-         WHERE type = 'credit_card'
+         WHERE (type = 'credit_card' OR credit_mode = 1)
          AND billing_date IS NOT NULL
          AND deadline_date IS NOT NULL`
       );

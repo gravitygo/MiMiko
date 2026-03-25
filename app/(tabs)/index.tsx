@@ -248,7 +248,7 @@ export default function HomeScreen() {
         id: cc.accountId,
         type: 'credit_card',
         title: cc.accountName,
-        subtitle: `Credit card · cycle ends ${billingEndFormatted}`,
+        subtitle: `Credit · cycle ends ${billingEndFormatted}`,
         amount: cc.amount,
         icon: 'card' as IconName,
         iconColor: '#0084D1',
@@ -512,6 +512,7 @@ export default function HomeScreen() {
           color: a.color,
           type: a.type,
           currency: a.currency,
+          creditMode: a.creditMode,
         }))}
       />
 

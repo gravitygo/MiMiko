@@ -6,6 +6,8 @@ const DEFAULT_CURRENCY = 'php';
 export function createAccount(input: CreateAccountInput): Account {
   const now = new Date().toISOString();
 
+  const hasCreditMode = input.creditMode === true || input.type === 'credit_card';
+
   return {
     id: Crypto.randomUUID(),
     name: input.name,
@@ -15,8 +17,9 @@ export function createAccount(input: CreateAccountInput): Account {
     icon: input.icon,
     color: input.color,
     isDefault: false,
-    billingDate: input.type === 'credit_card' ? input.billingDate : undefined,
-    deadlineDate: input.type === 'credit_card' ? input.deadlineDate : undefined,
+    creditMode: hasCreditMode || undefined,
+    billingDate: hasCreditMode ? input.billingDate : undefined,
+    deadlineDate: hasCreditMode ? input.deadlineDate : undefined,
     createdAt: now,
     updatedAt: now,
   };

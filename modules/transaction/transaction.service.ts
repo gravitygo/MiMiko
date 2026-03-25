@@ -18,7 +18,18 @@ export function createTransactionService() {
     type: 'expense' | 'income',
     reverse = false
   ): Promise<void> {
-    const adjustment = type === 'expense' ? -amount : amount;
+    const account = await accountService.getById(accountId);
+    const isCreditMode = account?.creditMode === true || account?.type === 'credit_card';
+
+    // For credit-mode accounts: expenses increase the outstanding balance (amount owed),
+    // income decreases it (paying down the balance).
+    // For regular accounts: expenses decrease balance, income increases it.
+    let adjustment: number;
+    if (isCreditMode) {
+      adjustment = type === 'expense' ? amount : -amount;
+    } else {
+      adjustment = type === 'expense' ? -amount : amount;
+    }
     const finalAdjustment = reverse ? -adjustment : adjustment;
 
     if (finalAdjustment > 0) {

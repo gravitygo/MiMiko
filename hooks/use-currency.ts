@@ -68,14 +68,16 @@ export function useCurrency(): UseCurrencyResult {
 }
 
 export function useTotalBalance(
-  accounts: Array<{ balance: number; currency?: string }>
+  accounts: Array<{ balance: number; currency?: string; creditMode?: boolean; type?: string }>
 ): { totalBalance: number; loading: boolean } {
   const { convert, loading } = useCurrency();
 
   const totalBalance = accounts.reduce((sum, account) => {
     const currency = account.currency || 'php';
     const convertedBalance = convert(account.balance, currency);
-    return sum + convertedBalance;
+    // Credit-mode accounts represent outstanding debt — subtract from net balance
+    const isCreditMode = account.creditMode === true || account.type === 'credit_card';
+    return sum + (isCreditMode ? -convertedBalance : convertedBalance);
   }, 0);
 
   return { totalBalance, loading };

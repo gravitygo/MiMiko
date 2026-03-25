@@ -9,7 +9,8 @@ export interface Account {
   icon: string;
   color: string;
   isDefault: boolean;
-  // Credit card specific fields
+  // Credit mode fields (available to any account type)
+  creditMode?: boolean; // When true, expenses add to balance (outstanding debt) instead of subtracting
   billingDate?: number; // Day of month (1-31) when billing cycle ends
   deadlineDate?: number; // Day of month (1-31) when payment is due
   createdAt: string;
@@ -25,6 +26,7 @@ export interface AccountRow {
   icon: string;
   color: string;
   is_default: number;
+  credit_mode: number | null;
   billing_date: number | null;
   deadline_date: number | null;
   created_at: string;
@@ -38,6 +40,7 @@ export interface CreateAccountInput {
   color: string;
   balance?: number;
   currency?: string;
+  creditMode?: boolean;
   billingDate?: number;
   deadlineDate?: number;
 }
@@ -48,6 +51,7 @@ export interface UpdateAccountInput {
   icon?: string;
   color?: string;
   currency?: string;
+  creditMode?: boolean;
   billingDate?: number;
   deadlineDate?: number;
 }

@@ -22,6 +22,7 @@ export const CREATE_TABLES = `
     icon TEXT NOT NULL,
     color TEXT NOT NULL,
     is_default INTEGER DEFAULT 0,
+    credit_mode INTEGER DEFAULT 0,
     billing_date INTEGER,
     deadline_date INTEGER,
     created_at TEXT NOT NULL,

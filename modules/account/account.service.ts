@@ -16,6 +16,10 @@ export function createAccountService() {
       const existing = await repository.findById(id);
       if (!existing) return null;
 
+      const hasCreditMode = input.creditMode !== undefined
+        ? input.creditMode
+        : (existing.creditMode ?? (existing.type === 'credit_card'));
+
       const updated: Account = {
         ...existing,
         name: input.name ?? existing.name,
@@ -23,6 +27,7 @@ export function createAccountService() {
         icon: input.icon ?? existing.icon,
         color: input.color ?? existing.color,
         currency: input.currency ?? existing.currency,
+        creditMode: hasCreditMode || undefined,
         billingDate: input.billingDate !== undefined ? input.billingDate : existing.billingDate,
         deadlineDate: input.deadlineDate !== undefined ? input.deadlineDate : existing.deadlineDate,
         updatedAt: new Date().toISOString(),
