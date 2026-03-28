@@ -18,7 +18,8 @@
 ## payable.service.ts
 - add() / edit() / remove()
 - getAll() / getUnpaid()
-- markPaid() / makePayment()
+- markPaid(id, fromAccountId?): debits fromAccountId if provided, then marks paid
+- makePayment(id, amount, fromAccountId?): debits fromAccountId if provided, then decrements remainingAmount
 
 ## payable.mapper.ts
 - mapRowToPayable(): DB → domain

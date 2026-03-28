@@ -88,14 +88,14 @@ export function usePayables() {
     }
   }, []);
 
-  const markPaid = useCallback(async (id: string) => {
+  const markPaid = useCallback(async (id: string, fromAccountId?: string) => {
     const { setLoading, setError, updatePayable } = usePayableStore.getState();
     setLoading(true);
     setError(null);
 
     try {
       const service = createPayableService();
-      await service.markPaid(id);
+      await service.markPaid(id, fromAccountId);
       const all = await service.getAll();
       const updated = all.find((p) => p.id === id);
       if (updated) updatePayable(updated);
@@ -109,14 +109,14 @@ export function usePayables() {
     }
   }, []);
 
-  const makePayment = useCallback(async (id: string, amount: number) => {
+  const makePayment = useCallback(async (id: string, amount: number, fromAccountId?: string) => {
     const { setLoading, setError, updatePayable } = usePayableStore.getState();
     setLoading(true);
     setError(null);
 
     try {
       const service = createPayableService();
-      await service.makePayment(id, amount);
+      await service.makePayment(id, amount, fromAccountId);
       const all = await service.getAll();
       const updated = all.find((p) => p.id === id);
       if (updated) updatePayable(updated);

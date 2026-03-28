@@ -16,9 +16,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DatePickerField } from '@/components/ui/date-picker-field';
 import { Colors } from '@/constants/theme';
+import { useAccounts } from '@/hooks/use-accounts';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePayables } from '@/hooks/use-payables';
+import type { Account } from '@/modules/account/account.types';
 import type { Payable } from '@/modules/payable/payable.types';
+import { useAccountStore } from '@/state/account.store';
 import { usePayableStore } from '@/state/payable.store';
 import { formatCurrency, getCurrencySymbol } from '@/state/settings.store';
 
@@ -116,9 +119,18 @@ export default function PayablesScreen() {
   // Detail / payment
   const [selectedPayable, setSelectedPayable] = useState<Payable | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [fromAccountId, setFromAccountId] = useState<string | null>(null);
 
   const payables = usePayableStore((s) => s.payables);
+  const accounts = useAccountStore((s) => s.accounts);
   const { fetch, add, remove, markPaid, makePayment } = usePayables();
+  const { fetch: fetchAccounts } = useAccounts();
+
+  // Exclude credit_card accounts — you can't pay a payable from a credit card
+  const payableAccounts = useMemo(
+    () => accounts.filter((a: Account) => a.type !== 'credit_card'),
+    [accounts]
+  );
 
   const displayPayables = useMemo(
     () => payables.filter((p) => (showPaid ? p.isPaid : !p.isPaid)),
@@ -131,8 +143,11 @@ export default function PayablesScreen() {
   );
 
   useEffect(() => {
-    fetch().finally(() => setLoading(false));
-  }, [fetch]);
+    Promise.all([
+      fetch(),
+      fetchAccounts(),
+    ]).finally(() => setLoading(false));
+  }, [fetch, fetchAccounts]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -166,23 +181,26 @@ export default function PayablesScreen() {
   const handleOpenDetail = useCallback((payable: Payable) => {
     setSelectedPayable(payable);
     setPaymentAmount('');
+    // Auto-select the default account
+    const defaultAccount = payableAccounts.find((a) => a.isDefault) ?? payableAccounts[0] ?? null;
+    setFromAccountId(defaultAccount?.id ?? null);
     setShowDetailModal(true);
-  }, []);
+  }, [payableAccounts]);
 
   const handleMarkPaid = useCallback(async () => {
     if (!selectedPayable) return;
-    await markPaid(selectedPayable.id);
+    await markPaid(selectedPayable.id, fromAccountId ?? undefined);
     setShowDetailModal(false);
-  }, [selectedPayable, markPaid]);
+  }, [selectedPayable, markPaid, fromAccountId]);
 
   const handleMakePayment = useCallback(async () => {
     if (!selectedPayable) return;
     const parsed = parseFloat(paymentAmount);
     if (isNaN(parsed) || parsed <= 0) return;
-    await makePayment(selectedPayable.id, parsed);
+    await makePayment(selectedPayable.id, parsed, fromAccountId ?? undefined);
     await fetch();
     setShowDetailModal(false);
-  }, [selectedPayable, paymentAmount, makePayment, fetch]);
+  }, [selectedPayable, paymentAmount, makePayment, fetch, fromAccountId]);
 
   const handleDelete = useCallback(async () => {
     if (!selectedPayable) return;
@@ -376,11 +394,51 @@ export default function PayablesScreen() {
 
                 {!selectedPayable.isPaid && (
                   <>
+                    {/* Account picker */}
+                    {payableAccounts.length > 0 && (
+                      <>
+                        <Text style={{ color: colors.textSecondary }} className="text-sm mb-2">Pay from</Text>
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          className="mb-4"
+                          contentContainerStyle={{ gap: 8 }}
+                        >
+                          {payableAccounts.map((account: Account) => {
+                            const isSelected = fromAccountId === account.id;
+                            return (
+                              <Pressable
+                                key={account.id}
+                                onPress={() => setFromAccountId(account.id)}
+                                className="px-4 py-2.5 rounded-bento"
+                                style={{
+                                  backgroundColor: isSelected ? colors.tint : colors.surfaceHover,
+                                }}
+                              >
+                                <Text
+                                  className="font-semibold text-sm"
+                                  style={{ color: isSelected ? '#FFFFFF' : colors.textSecondary }}
+                                >
+                                  {account.name}
+                                </Text>
+                                <Text
+                                  className="text-xs mt-0.5"
+                                  style={{ color: isSelected ? '#FFFFFFAA' : colors.textMuted }}
+                                >
+                                  {formatCurrency(account.balance)}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </ScrollView>
+                      </>
+                    )}
+
                     <Text style={{ color: colors.textSecondary }} className="text-sm mb-2">Make a payment</Text>
                     <TextInput
                       value={paymentAmount}
                       onChangeText={(t) => setPaymentAmount(t.replace(/[^0-9.]/g, ''))}
-                      placeholder="$0.00"
+                      placeholder={`${getCurrencySymbol()}0.00`}
                       placeholderTextColor={colors.textMuted}
                       keyboardType="decimal-pad"
                       style={{ backgroundColor: colors.surfaceHover, color: colors.text }}

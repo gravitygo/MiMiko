@@ -1,3 +1,4 @@
+import { createAccountService } from '@/modules/account/account.service';
 import { createPayable } from './payable.model';
 import { createPayableRepository } from './payable.repository';
 import type { CreatePayableInput, Payable, UpdatePayableInput } from './payable.types';
@@ -43,11 +44,22 @@ export function createPayableService() {
       return repo.findUnpaid();
     },
 
-    async markPaid(id: string): Promise<void> {
+    async markPaid(id: string, fromAccountId?: string): Promise<void> {
+      if (fromAccountId) {
+        const payable = await repo.findById(id);
+        if (payable && payable.remainingAmount > 0) {
+          const accountService = createAccountService();
+          await accountService.debit(fromAccountId, payable.remainingAmount);
+        }
+      }
       await repo.markPaid(id);
     },
 
-    async makePayment(id: string, amount: number): Promise<void> {
+    async makePayment(id: string, amount: number, fromAccountId?: string): Promise<void> {
+      if (fromAccountId) {
+        const accountService = createAccountService();
+        await accountService.debit(fromAccountId, amount);
+      }
       await repo.makePayment(id, amount);
     },
   };
