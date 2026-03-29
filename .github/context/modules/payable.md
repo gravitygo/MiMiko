@@ -18,8 +18,12 @@
 ## payable.service.ts
 - add() / edit() / remove()
 - getAll() / getUnpaid()
-- markPaid(id, fromAccountId?): debits fromAccountId if provided, then marks paid
-- makePayment(id, amount, fromAccountId?): debits fromAccountId if provided, then decrements remainingAmount
+- markPaid(id, fromAccountId?): debits fromAccountId if provided, credits payable.accountId (credit card) if set, then marks paid
+- makePayment(id, amount, fromAccountId?): debits fromAccountId if provided, credits payable.accountId (credit card) if set, then decrements remainingAmount
+
+## payables.tsx (UI)
+- create modal: credit card account picker (horizontal scroll, toggle-select) links payable to a credit card via accountId
+- payment flow: after markPaid / makePayment, calls fetchAccounts() to refresh balances
 
 ## payable.mapper.ts
 - mapRowToPayable(): DB → domain

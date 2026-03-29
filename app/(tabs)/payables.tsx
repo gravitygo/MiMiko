@@ -120,6 +120,7 @@ export default function PayablesScreen() {
   const [selectedPayable, setSelectedPayable] = useState<Payable | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [fromAccountId, setFromAccountId] = useState<string | null>(null);
+  const [linkedAccountId, setLinkedAccountId] = useState<string | null>(null);
 
   const payables = usePayableStore((s) => s.payables);
   const accounts = useAccountStore((s) => s.accounts);
@@ -129,6 +130,12 @@ export default function PayablesScreen() {
   // Exclude credit_card accounts — you can't pay a payable from a credit card
   const payableAccounts = useMemo(
     () => accounts.filter((a: Account) => a.type !== 'credit_card'),
+    [accounts]
+  );
+
+  // Only credit_card accounts — for linking a payable to a card
+  const creditCardAccounts = useMemo(
+    () => accounts.filter((a: Account) => a.type === 'credit_card'),
     [accounts]
   );
 
@@ -160,6 +167,7 @@ export default function PayablesScreen() {
     setAmount('');
     setDueDate(new Date().toISOString().split('T')[0]);
     setDescription('');
+    setLinkedAccountId(null);
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -172,11 +180,12 @@ export default function PayablesScreen() {
       totalAmount: parsedAmount,
       dueDate,
       description: description.trim() || undefined,
+      accountId: linkedAccountId ?? undefined,
     });
     setSubmitting(false);
     setShowModal(false);
     resetForm();
-  }, [name, amount, dueDate, description, add, resetForm]);
+  }, [name, amount, dueDate, description, linkedAccountId, add, resetForm]);
 
   const handleOpenDetail = useCallback((payable: Payable) => {
     setSelectedPayable(payable);
@@ -190,8 +199,9 @@ export default function PayablesScreen() {
   const handleMarkPaid = useCallback(async () => {
     if (!selectedPayable) return;
     await markPaid(selectedPayable.id, fromAccountId ?? undefined);
+    await fetchAccounts();
     setShowDetailModal(false);
-  }, [selectedPayable, markPaid, fromAccountId]);
+  }, [selectedPayable, markPaid, fromAccountId, fetchAccounts]);
 
   const handleMakePayment = useCallback(async () => {
     if (!selectedPayable) return;
@@ -199,8 +209,9 @@ export default function PayablesScreen() {
     if (isNaN(parsed) || parsed <= 0) return;
     await makePayment(selectedPayable.id, parsed, fromAccountId ?? undefined);
     await fetch();
+    await fetchAccounts();
     setShowDetailModal(false);
-  }, [selectedPayable, paymentAmount, makePayment, fetch, fromAccountId]);
+  }, [selectedPayable, paymentAmount, makePayment, fetch, fetchAccounts, fromAccountId]);
 
   const handleDelete = useCallback(async () => {
     if (!selectedPayable) return;
@@ -332,6 +343,43 @@ export default function PayablesScreen() {
               />
 
               <View className="h-4" />
+
+              {creditCardAccounts.length > 0 && (
+                <>
+                  <Text style={{ color: colors.textSecondary }} className="text-sm mb-2">Link to Credit Card (optional)</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    className="mb-4"
+                    contentContainerStyle={{ gap: 8 }}
+                  >
+                    {creditCardAccounts.map((account: Account) => {
+                      const isSelected = linkedAccountId === account.id;
+                      return (
+                        <Pressable
+                          key={account.id}
+                          onPress={() => setLinkedAccountId(isSelected ? null : account.id)}
+                          className="px-4 py-2.5 rounded-bento"
+                          style={{ backgroundColor: isSelected ? colors.tint : colors.surfaceHover }}
+                        >
+                          <Text
+                            className="font-semibold text-sm"
+                            style={{ color: isSelected ? '#FFFFFF' : colors.textSecondary }}
+                          >
+                            {account.name}
+                          </Text>
+                          <Text
+                            className="text-xs mt-0.5"
+                            style={{ color: isSelected ? '#FFFFFFAA' : colors.textMuted }}
+                          >
+                            {formatCurrency(account.balance)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              )}
 
               <Text style={{ color: colors.textSecondary }} className="text-sm mb-2">Description (optional)</Text>
               <TextInput

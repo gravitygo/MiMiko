@@ -45,21 +45,33 @@ export function createPayableService() {
     },
 
     async markPaid(id: string, fromAccountId?: string): Promise<void> {
-      if (fromAccountId) {
-        const payable = await repo.findById(id);
-        if (payable && payable.remainingAmount > 0) {
-          const accountService = createAccountService();
+      const payable = await repo.findById(id);
+      if (!payable) return;
+
+      if (payable.remainingAmount > 0) {
+        const accountService = createAccountService();
+        if (fromAccountId) {
           await accountService.debit(fromAccountId, payable.remainingAmount);
         }
+        if (payable.accountId) {
+          await accountService.credit(payable.accountId, payable.remainingAmount);
+        }
       }
+
       await repo.markPaid(id);
     },
 
     async makePayment(id: string, amount: number, fromAccountId?: string): Promise<void> {
+      const payable = await repo.findById(id);
+      const accountService = createAccountService();
+
       if (fromAccountId) {
-        const accountService = createAccountService();
         await accountService.debit(fromAccountId, amount);
       }
+      if (payable?.accountId) {
+        await accountService.credit(payable.accountId, amount);
+      }
+
       await repo.makePayment(id, amount);
     },
   };
